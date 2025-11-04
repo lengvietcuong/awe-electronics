@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth-context";
 
 export interface CheckoutContactForm {
   firstName: string;
@@ -26,10 +27,16 @@ const DEFAULT_CONTACT: CheckoutContactForm = {
 export interface CheckoutContactProps {
   value?: CheckoutContactForm;
   onChange?: (value: CheckoutContactForm) => void;
+  isLoggedIn?: boolean;
 }
 
-export function CheckoutContactSection({ value, onChange }: CheckoutContactProps) {
+export function CheckoutContactSection({ value, onChange, isLoggedIn: isLoggedInServer = false }: CheckoutContactProps) {
   const formState = value ?? DEFAULT_CONTACT;
+  const { isLoggedIn: isLoggedInClient } = useAuth();
+  
+  // Use client-side auth state as it's more up-to-date
+  // Fall back to server-side if client hasn't loaded yet
+  const isLoggedIn = isLoggedInClient || isLoggedInServer;
 
   const updateForm = React.useCallback(
     (patch: Partial<CheckoutContactForm>) => {
@@ -77,9 +84,11 @@ export function CheckoutContactSection({ value, onChange }: CheckoutContactProps
           Keep me updated with product launches and seasonal bundles.
         </Label>
       </div>
-      <Button variant="outline" size="sm">
-        Already have an account? Sign in
-      </Button>
+      {!isLoggedIn && (
+        <Button variant="outline" size="sm" asChild>
+          <a href="/auth/login">Already have an account? Sign in</a>
+        </Button>
+      )}
     </div>
   );
 }

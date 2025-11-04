@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Lock, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Lock, ShieldCheck } from "lucide-react";
 
 import { CartSummaryPanel, type CartSummaryData, type UpsellProduct } from "@/components/cart/cart-summary";
 import { CheckoutStepper } from "@/components/checkout/checkout-stepper";
@@ -34,6 +34,7 @@ export interface CheckoutFlowProps {
   shippingOptions: ShippingOption[];
   paymentMethods: PaymentMethodOption[];
   onSubmit: (payload: CheckoutSubmissionPayload) => Promise<{ success: boolean; orderNumber?: string; message?: string }>;
+  currentUser?: { id: number; email: string; first_name: string; last_name: string; phone?: string | null } | null;
 }
 
 const EMPTY_CONTACT: CheckoutContactForm = {
@@ -69,20 +70,52 @@ export function CheckoutFlow({
   shippingOptions,
   paymentMethods,
   onSubmit,
+  currentUser,
 }: CheckoutFlowProps) {
-  const [contact, setContact] = React.useState<CheckoutContactForm>(EMPTY_CONTACT);
+  const initialShippingMethod = React.useMemo(() => shippingOptions[0]?.id ?? "STANDARD", [shippingOptions]);
+  const initialPaymentMethod = React.useMemo(() => paymentMethods[0]?.id ?? "CREDIT_CARD", [paymentMethods]);
+
+  const initialContact = React.useMemo(() => {
+    if (currentUser) {
+      return {
+        firstName: currentUser.first_name,
+        lastName: currentUser.last_name,
+        email: currentUser.email,
+        phone: currentUser.phone || "",
+        marketingOptIn: false,
+      };
+    }
+    return EMPTY_CONTACT;
+  }, [currentUser]);
+
+  const [contact, setContact] = React.useState<CheckoutContactForm>(initialContact);
   const [address, setAddress] = React.useState<CheckoutAddressForm>(EMPTY_ADDRESS);
-  const [shippingMethod, setShippingMethod] = React.useState<ShippingOption["id"]>(shippingOptions[0]?.id ?? "STANDARD");
-  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId>(paymentMethods[0]?.id ?? "CREDIT_CARD");
+  const [shippingMethod, setShippingMethod] = React.useState<ShippingOption["id"]>(initialShippingMethod);
+  const [paymentMethod, setPaymentMethod] = React.useState<PaymentMethodId>(initialPaymentMethod);
   const [cardDetails, setCardDetails] = React.useState<CardDetails>(EMPTY_CARD);
   const [orderNotes, setOrderNotes] = React.useState("");
-  const [feedback, setFeedback] = React.useState<{ success: boolean; message: string } | null>(null);
+  const [successState, setSuccessState] = React.useState<{ orderNumber?: string; message: string } | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isPending, startTransition] = React.useTransition();
 
+  React.useEffect(() => {
+    if (!showSuccessModal) return;
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowSuccessModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => window.removeEventListener("keydown", handleKeydown);
+  }, [showSuccessModal]);
+
   const handleSubmit = () => {
     setError(null);
-    setFeedback(null);
+    setSuccessState(null);
+    setShowSuccessModal(false);
 
     const payload: CheckoutSubmissionPayload = {
       contact,
@@ -97,7 +130,15 @@ export function CheckoutFlow({
       try {
         const result = await onSubmit(payload);
         if (result.success) {
-          setFeedback({ success: true, message: result.message ?? "Order placed successfully." });
+          const message = result.message ?? "Order placed successfully.";
+          setSuccessState({ orderNumber: result.orderNumber, message });
+          setShowSuccessModal(true);
+          setContact(() => ({ ...EMPTY_CONTACT }));
+          setAddress(() => ({ ...EMPTY_ADDRESS }));
+          setShippingMethod(initialShippingMethod);
+          setPaymentMethod(initialPaymentMethod);
+          setCardDetails(() => ({ ...EMPTY_CARD }));
+          setOrderNotes("");
         } else {
           setError(result.message ?? "We couldn’t complete your checkout. Please try again.");
         }
@@ -108,13 +149,66 @@ export function CheckoutFlow({
     });
   };
 
+  const closeSuccessModal = () => {
+    setShowSuccessModal(false);
+    window.location.href = "/orders";
+  };
+
   return (
-    <div className="space-y-12">
-      <div className="space-y-3 text-sm text-muted-foreground">
-        <Link href="/cart" className="inline-flex items-center gap-2 font-medium text-primary">
-          <ArrowLeft className="h-4 w-4" /> Return to cart
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
+    <>
+      {showSuccessModal && successState ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="order-success-title"
+          onClick={closeSuccessModal}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl border border-border/80 bg-card shadow-xl"
+            role="document"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 border-b border-border/60 p-6">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                <CheckCircle2 className="h-6 w-6" />
+              </span>
+              <div className="space-y-1">
+                <h2 id="order-success-title" className="text-xl font-semibold text-foreground">
+                  Order confirmed!
+                </h2>
+                <p className="text-sm text-muted-foreground">{successState.message}</p>
+              </div>
+            </div>
+            <div className="space-y-4 p-6 text-sm text-muted-foreground">
+              {successState.orderNumber ? (
+                <p>
+                  Your order number is <span className="font-semibold text-foreground">{successState.orderNumber}</span>. Keep it handy for delivery updates and support.
+                </p>
+              ) : null}
+              <p>We&apos;ve emailed a confirmation along with delivery timelines and tracking details as soon as they&apos;re ready.</p>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-border/60 p-6 sm:flex-row sm:items-center sm:justify-end">
+              <Button variant="ghost" onClick={closeSuccessModal} className="w-full sm:w-auto">
+                Close
+              </Button>
+              <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Link href="/order-tracking">Track delivery</Link>
+              </Button>
+              <Button asChild className="w-full sm:w-auto">
+                <Link href="/orders">View orders</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="space-y-12">
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <Link href="/cart" className="inline-flex items-center gap-2 font-medium text-primary">
+            <ArrowLeft className="h-4 w-4" /> Return to cart
+          </Link>
+          <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Secure checkout</h1>
           <Badge variant="secondary" className="gap-2">
             <Lock className="h-3.5 w-3.5" /> AES-256 encrypted
@@ -132,7 +226,7 @@ export function CheckoutFlow({
               <p className="text-sm text-muted-foreground">We&apos;ll keep you updated on delivery milestones and installation scheduling.</p>
             </CardHeader>
             <CardContent>
-              <CheckoutContactSection value={contact} onChange={setContact} />
+              <CheckoutContactSection value={contact} onChange={setContact} isLoggedIn={!!currentUser} />
             </CardContent>
           </Card>
 
@@ -188,7 +282,7 @@ export function CheckoutFlow({
                 {isPending ? "Placing order…" : "Place order now"}
               </Button>
               {error ? <p className="text-sm text-rose-600">{error}</p> : null}
-              {feedback ? <p className="text-sm text-emerald-600">{feedback.message}</p> : null}
+              {successState ? <p className="text-sm text-emerald-600">{successState.message}</p> : null}
               <p className="text-xs text-muted-foreground">
                 By placing this order, you agree to our terms of sale and privacy policy. We&apos;ll never charge you until you confirm.
               </p>
@@ -231,6 +325,7 @@ export function CheckoutFlow({
           </Button>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }

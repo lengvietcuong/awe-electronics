@@ -61,6 +61,36 @@ export function CheckoutPaymentSection({ methods, value, onChange, cardDetails, 
     onCardDetailsChange?.({ ...details, ...patch });
   };
 
+  const formatCardNumber = (value: string) => {
+    const cleaned = value.replace(/\s/g, "");
+    const chunks = cleaned.match(/.{1,4}/g) || [];
+    return chunks.join(" ");
+  };
+
+  const formatExpiry = (value: string) => {
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length >= 2) {
+      return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}`;
+    }
+    return cleaned;
+  };
+
+  const handleCardNumberChange = (value: string) => {
+    const cleaned = value.replace(/\s/g, "");
+    if (cleaned.length <= 16) {
+      const formatted = formatCardNumber(cleaned);
+      handleDetailsChange({ cardNumber: formatted });
+    }
+  };
+
+  const handleExpiryChange = (value: string) => {
+    const cleaned = value.replace(/\D/g, "");
+    if (cleaned.length <= 4) {
+      const formatted = formatExpiry(cleaned);
+      handleDetailsChange({ cardExpiry: formatted });
+    }
+  };
+
   const selectedMethod = methods.find((method) => method.id === selected) ?? methods[0];
 
   return (
@@ -97,10 +127,10 @@ export function CheckoutPaymentSection({ methods, value, onChange, cardDetails, 
             <p className="text-sm font-medium text-foreground">Card details</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="card-holder">Card holder</Label>
+                <Label htmlFor="card-holder">Name on card</Label>
                 <Input
                   id="card-holder"
-                  placeholder="First Last"
+                  placeholder="John Smith"
                   value={details.cardHolder}
                   onChange={(event) => handleDetailsChange({ cardHolder: event.target.value })}
                 />
@@ -111,7 +141,8 @@ export function CheckoutPaymentSection({ methods, value, onChange, cardDetails, 
                   id="card-number"
                   placeholder="1234 5678 9012 3456"
                   value={details.cardNumber}
-                  onChange={(event) => handleDetailsChange({ cardNumber: event.target.value })}
+                  onChange={(event) => handleCardNumberChange(event.target.value)}
+                  maxLength={19}
                 />
               </div>
             </div>
@@ -122,7 +153,8 @@ export function CheckoutPaymentSection({ methods, value, onChange, cardDetails, 
                   id="card-expiry"
                   placeholder="MM/YY"
                   value={details.cardExpiry}
-                  onChange={(event) => handleDetailsChange({ cardExpiry: event.target.value })}
+                  onChange={(event) => handleExpiryChange(event.target.value)}
+                  maxLength={5}
                 />
               </div>
               <div className="space-y-2">
@@ -130,8 +162,10 @@ export function CheckoutPaymentSection({ methods, value, onChange, cardDetails, 
                 <Input
                   id="card-cvv"
                   placeholder="123"
+                  type="password"
                   value={details.cardCvv}
                   onChange={(event) => handleDetailsChange({ cardCvv: event.target.value })}
+                  maxLength={4}
                 />
               </div>
             </div>

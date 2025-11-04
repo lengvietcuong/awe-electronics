@@ -176,7 +176,7 @@ export default async function OrderTrackingPage({
 
             <Card className="border-border/80">
               <CardHeader className="flex flex-row items-start gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Mail className="h-4 w-4" />
                 </span>
                 <div className="space-y-1">
@@ -192,7 +192,7 @@ export default async function OrderTrackingPage({
 
             <Card className="border-border/80">
               <CardHeader className="flex flex-row items-start gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <ShieldCheck className="h-4 w-4" />
                 </span>
                 <div className="space-y-1">

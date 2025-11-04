@@ -2,9 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Menu, ShoppingCart, X, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Menu, ShoppingCart, X, Zap, User, LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { clearAuthToken } from "@/lib/auth-client";
+import { clearAuthTokenCookie } from "@/lib/actions/auth";
+import { useAuth } from "@/lib/auth-context";
 
 const primaryNav = [
   { href: "/products", label: "Shop" },
@@ -19,7 +23,9 @@ interface SiteHeaderProps {
 }
 
 export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const { isLoggedIn, updateAuthState } = useAuth();
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -31,6 +37,14 @@ export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [menuOpen]);
+
+  const handleLogout = async () => {
+    clearAuthToken();
+    await clearAuthTokenCookie();
+    updateAuthState();
+    router.push("/");
+    router.refresh();
+  };
 
   return (
   <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
@@ -66,12 +80,28 @@ export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
             </span>
           </Link>
           <div className="hidden items-center gap-2 sm:flex">
-            <Button variant="ghost" asChild>
-              <Link href="/auth/login">Sign in</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/auth/register">Create account</Link>
-            </Button>
+            {isLoggedIn ? (
+              <>
+                <Button variant="ghost" size="icon" asChild>
+                  <Link href="/orders" aria-label="My orders">
+                    <User className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button variant="ghost" onClick={handleLogout} className="gap-2">
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link href="/auth/login">Sign in</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/auth/register">Create account</Link>
+                </Button>
+              </>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -84,12 +114,12 @@ export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
           </Button>
         </div>
       </div>
-      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} isLoggedIn={isLoggedIn} onLogout={handleLogout} />
     </header>
   );
 }
 
-function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+function MobileMenu({ open, onClose, isLoggedIn, onLogout }: { open: boolean; onClose: () => void; isLoggedIn: boolean; onLogout: () => void }) {
   if (!open) return null;
 
   return (
@@ -114,16 +144,33 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
                 </div>
               </Link>
             </Button>
-            <Button variant="ghost" asChild>
-              <Link href="/auth/login" onClick={onClose}>
-                Sign in
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/auth/register" onClick={onClose}>
-                Create account
-              </Link>
-            </Button>
+            {isLoggedIn ? (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link href="/orders" onClick={onClose}>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" /> My orders
+                    </div>
+                  </Link>
+                </Button>
+                <Button variant="ghost" onClick={() => { onLogout(); onClose(); }} className="gap-2">
+                  <LogOut className="h-4 w-4" /> Sign out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link href="/auth/login" onClick={onClose}>
+                    Sign in
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/auth/register" onClick={onClose}>
+                    Create account
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
         </nav>
       </div>

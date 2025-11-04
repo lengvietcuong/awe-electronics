@@ -1,4 +1,4 @@
-import { API_BASE_URL, DEFAULT_FETCH_OPTIONS, SESSION_COOKIE_NAME } from "./config";
+import { API_BASE_URL, DEFAULT_FETCH_OPTIONS } from "./config";
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

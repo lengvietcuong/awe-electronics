@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { Metadata } from "next";
+import { revalidatePath } from "next/cache";
 
 import { CheckoutFlow, type CheckoutSubmissionPayload } from "@/components/checkout/checkout-flow";
-import { fetchCart } from "@/lib/api/cart";
+import { clearCart, fetchCart } from "@/lib/api/cart";
 import { fetchProducts } from "@/lib/api/products";
 import { submitCheckout } from "@/lib/api/checkout";
+import { getCurrentUserServer } from "@/lib/api/auth.server";
 import { ApiError } from "@/lib/api/client";
 
 export const metadata: Metadata = {
@@ -29,6 +31,18 @@ export default async function CheckoutPage() {
 
   if (!cart || cart.items.length === 0) {
     redirect("/cart");
+  }
+
+  let currentUser = null;
+  try {
+    currentUser = await getCurrentUserServer();
+    console.log("[Checkout] Current user loaded:", currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : "null");
+  } catch (error) {
+    // User is not logged in or session expired
+    console.log("[Checkout] Failed to load user:", error instanceof ApiError ? `${error.status} ${error.statusText}` : error);
+    if (!(error instanceof ApiError && error.status === 401)) {
+      console.error("Error fetching current user:", error);
+    }
   }
 
   const [productResults] = await Promise.all([
@@ -150,6 +164,17 @@ export default async function CheckoutPage() {
         paypal_email: payload.paymentMethod === "PAYPAL" ? payload.cardDetails.paypalEmail : undefined,
       });
 
+      try {
+        await clearCart();
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          console.error("Failed to clear cart after checkout:", error);
+        }
+      }
+
+      revalidatePath("/orders");
+      revalidatePath("/", "layout");
+
       return {
         success: true,
         orderNumber: response.order_number,
@@ -186,6 +211,7 @@ export default async function CheckoutPage() {
       shippingOptions={shippingOptions.map((option) => ({ ...option }))}
       paymentMethods={paymentMethods}
       onSubmit={placeOrder}
+      currentUser={currentUser}
     />
   );
 }
