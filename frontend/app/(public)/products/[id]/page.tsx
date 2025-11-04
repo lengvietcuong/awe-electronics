@@ -109,6 +109,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       price: item.price,
       description: item.description ?? undefined,
       stockStatus: formatStockStatus(item.is_available, item.is_low_stock),
+      imageUrl: item.image_url,
       href: `/products/${item.id}`,
     }));
 

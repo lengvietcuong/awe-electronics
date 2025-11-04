@@ -101,6 +101,7 @@ export default async function HomePage() {
     price: product.price,
     description: product.description ?? undefined,
     stockStatus: formatStockStatus(product.is_available, product.is_low_stock),
+    imageUrl: product.image_url,
     href: `/products/${product.id}`,
   }));
 

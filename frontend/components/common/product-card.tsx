@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowUpRight, Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ export interface ProductCardProps {
   stockStatus?: string;
   rating?: number;
   reviews?: number;
+  imageUrl?: string | null;
 }
 
 export function ProductCard({
@@ -31,6 +33,7 @@ export function ProductCard({
   stockStatus,
   rating,
   reviews,
+  imageUrl,
   href = `/products/${id}`,
 }: ProductCardProps) {
   const stockTone = stockStatus
@@ -43,6 +46,17 @@ export function ProductCard({
 
   return (
     <Card className="flex h-full flex-col border-border/80">
+      {imageUrl ? (
+        <div className="relative aspect-video w-full overflow-hidden rounded-t-lg border-b border-border/80 bg-muted">
+          <Image
+            src={imageUrl}
+            alt={name}
+            fill
+            className="object-cover"
+            sizes="(min-width: 1280px) 400px, (min-width: 768px) 50vw, 100vw"
+          />
+        </div>
+      ) : null}
       <CardHeader className="space-y-4">
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
