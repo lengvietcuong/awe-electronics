@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Menu, ShoppingCart, X } from "lucide-react";
+import { Menu, ShoppingCart, X, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -14,7 +14,11 @@ const primaryNav = [
   { href: "/order-tracking", label: "Track Order" },
 ];
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  cartItemCount?: number;
+}
+
+export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -33,8 +37,8 @@ export function SiteHeader() {
   <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2 text-lg font-semibold">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-lg text-primary-foreground shadow">
-              AE
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
+              <Zap className="h-6 w-6" />
             </span>
             <span className="hidden sm:inline">AWE Electronics</span>
           </Link>
@@ -58,7 +62,7 @@ export function SiteHeader() {
             <ShoppingCart className="h-4 w-4" />
             <span>Cart</span>
             <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
-              0
+              {cartItemCount}
             </span>
           </Link>
           <div className="hidden items-center gap-2 sm:flex">

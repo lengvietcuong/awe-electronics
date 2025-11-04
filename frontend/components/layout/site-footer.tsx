@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Zap } from "lucide-react";
 
 const footerLinks = [
   {
@@ -38,7 +39,7 @@ export function SiteFooter() {
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-lg font-semibold">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
-                AE
+                <Zap className="h-6 w-6" />
               </span>
               <span>AWE Electronics</span>
             </div>
@@ -54,7 +55,7 @@ export function SiteFooter() {
                 </h3>
                 <ul className="space-y-2 text-sm text-muted-foreground/90">
                   {section.links.map((link) => (
-                    <li key={link.href}>
+                    <li key={link.label}>
                       <Link
                         href={link.href}
                         className="transition-colors hover:text-foreground"

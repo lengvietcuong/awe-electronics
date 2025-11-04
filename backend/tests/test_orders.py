@@ -57,12 +57,10 @@ class TestCheckout:
             "/api/checkout",
             headers={"X-Session-ID": session_id},
             json={
-                "guest_info": {
-                    "email": "guest@test.com",
-                    "first_name": "Guest",
-                    "last_name": "User",
-                    "phone": "0400999888",
-                },
+                "guest_email": "guest@test.com",
+                "guest_first_name": "Guest",
+                "guest_last_name": "User",
+                "guest_phone": "0400999888",
                 "payment_method": "PAYPAL",
                 "shipping_method": "EXPRESS",
                 "delivery_address": {
@@ -74,7 +72,11 @@ class TestCheckout:
                 },
             },
         )
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "order_number" in data
+        assert data["status"] == "PAID"
+        assert "order_id" in data
 
     def test_checkout_empty_cart(self, client, auth_headers_customer):
         """Test checkout with empty cart"""

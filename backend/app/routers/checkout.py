@@ -2,7 +2,7 @@
 Checkout router - Place orders and process payments
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -26,6 +26,7 @@ def checkout(
     checkout_data: CheckoutRequest,
     db: Session = Depends(get_db),
     current_account: Optional[Account] = Depends(get_current_user_optional),
+    session_id: Optional[str] = Header(None, alias="X-Session-ID"),
 ):
     """
     Complete checkout process
@@ -42,6 +43,8 @@ def checkout(
     """
     # Get or create customer
     customer = None
+    cart = None
+
     if current_account:
         # Registered customer
         customer = CustomerAccountManager.get_customer_by_account(db, current_account)
@@ -63,6 +66,13 @@ def checkout(
                 detail="Guest checkout requires email, first name, and last name",
             )
 
+        # Get the guest's cart by session ID first
+        if session_id:
+            cart = ShoppingCartManager.get_or_create_cart(
+                db, customer_id=None, session_id=session_id
+            )
+
+        # Create guest customer
         customer = CustomerAccountManager.create_guest_customer(
             db,
             checkout_data.guest_email,
@@ -71,8 +81,13 @@ def checkout(
             checkout_data.guest_phone,
         )
 
-        # For guest, we need session ID - for simplicity, create new cart
-        cart = ShoppingCartManager.get_or_create_cart(db, customer_id=customer.id)
+        # Update cart to associate it with the guest customer
+        if cart:
+            cart.customer_id = customer.id
+            db.commit()
+        else:
+            # No session cart found, create new empty cart
+            cart = ShoppingCartManager.get_or_create_cart(db, customer_id=customer.id)
 
     # Validate cart
     if not cart.items:

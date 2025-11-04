@@ -29,7 +29,10 @@ class TestShoppingCart:
             headers={"X-Session-ID": "guest-session-123"},
             json={"product_id": product_id, "quantity": 1},
         )
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["product_id"] == product_id
+        assert data["quantity"] == 1
 
     def test_add_nonexistent_product_to_cart(self, client, auth_headers_customer):
         """Test adding non-existent product to cart"""

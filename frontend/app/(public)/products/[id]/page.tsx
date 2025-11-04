@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { fetchProductById, fetchProducts } from "@/lib/api/products";
 import { ApiError } from "@/lib/api/client";
 import { formatStockStatus } from "@/lib/formatters";
+import { AddToCartButton } from "@/components/product/add-to-cart-button";
 
 const priceFormatter = new Intl.NumberFormat("en-AU", {
   style: "currency",
@@ -38,7 +39,8 @@ async function loadProduct(productId: number) {
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const productId = Number(params.id);
+  const { id } = await params;
+  const productId = Number(id);
 
   if (Number.isNaN(productId)) {
     return {
@@ -73,7 +75,8 @@ function parseSpecifications(specifications: string | null) {
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const productId = Number(params.id);
+  const { id } = await params;
+  const productId = Number(id);
 
   if (Number.isNaN(productId)) {
     notFound();
@@ -160,9 +163,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
               </div>
 
               <div className="space-y-3">
-                <Button size="lg" className="w-full">
-                  Add to cart
-                </Button>
+                <AddToCartButton productId={product.id} size="lg" className="w-full" />
                 <Button variant="outline" size="lg" className="w-full" asChild>
                   <Link href="/checkout">Buy now</Link>
                 </Button>

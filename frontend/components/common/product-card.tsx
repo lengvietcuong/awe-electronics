@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowUpRight, ShoppingCart, Star } from "lucide-react";
+import { ArrowUpRight, Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AddToCartButton } from "@/components/product/add-to-cart-button";
 
 export interface ProductCardProps {
   id: number | string;
@@ -73,9 +76,7 @@ export function ProductCard({
             View details <ArrowUpRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
-        <Button variant="outline">
-          <ShoppingCart className="mr-2 h-4 w-4" /> Add to cart
-        </Button>
+        <AddToCartButton productId={Number(id)} variant="outline" />
       </CardContent>
     </Card>
   );

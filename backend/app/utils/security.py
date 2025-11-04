@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -133,10 +133,20 @@ def get_current_manager(
 
 # Optional authentication (for guest checkout)
 def get_current_user_optional(
-    token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    authorization: Optional[str] = Header(None), db: Session = Depends(get_db)
 ) -> Optional[Account]:
     """Get current user if authenticated, None otherwise"""
-    if token is None:
+    if authorization is None:
+        return None
+
+    # Extract token from "Bearer <token>" format
+    token = None
+    if authorization.startswith("Bearer "):
+        token = authorization[7:]
+    else:
+        token = authorization
+
+    if not token:
         return None
 
     try:
