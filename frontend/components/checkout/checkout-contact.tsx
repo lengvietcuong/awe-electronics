@@ -2,24 +2,47 @@
 
 import * as React from "react";
 
-import type { CheckoutContact } from "@/lib/data/mock";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export interface CheckoutContactProps {
-  contact: CheckoutContact;
+export interface CheckoutContactForm {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  marketingOptIn: boolean;
 }
 
-export function CheckoutContactSection({ contact }: CheckoutContactProps) {
-  const [formState, setFormState] = React.useState(contact);
+const DEFAULT_CONTACT: CheckoutContactForm = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  marketingOptIn: false,
+};
 
-  const handleChange = (key: keyof CheckoutContact) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value = key === "marketingOptIn" ? (event.target as HTMLInputElement).checked : event.target.value;
-      setFormState((prev) => ({ ...prev, [key]: value }));
-    };
+export interface CheckoutContactProps {
+  value?: CheckoutContactForm;
+  onChange?: (value: CheckoutContactForm) => void;
+}
+
+export function CheckoutContactSection({ value, onChange }: CheckoutContactProps) {
+  const formState = value ?? DEFAULT_CONTACT;
+
+  const updateForm = React.useCallback(
+    (patch: Partial<CheckoutContactForm>) => {
+      onChange?.({ ...formState, ...patch });
+    },
+    [formState, onChange],
+  );
+
+  const handleChange = (key: keyof CheckoutContactForm) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue =
+      key === "marketingOptIn" ? (event.target as HTMLInputElement).checked : event.target.value;
+    updateForm({ [key]: nextValue } as Partial<CheckoutContactForm>);
+  };
 
   return (
     <div className="space-y-4">
@@ -49,11 +72,7 @@ export function CheckoutContactSection({ contact }: CheckoutContactProps) {
         </div>
       </div>
       <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
-        <Checkbox
-          id="marketing-opt-in"
-          checked={formState.marketingOptIn}
-          onChange={handleChange("marketingOptIn")}
-        />
+        <Checkbox id="marketing-opt-in" checked={formState.marketingOptIn} onChange={handleChange("marketingOptIn")} />
         <Label htmlFor="marketing-opt-in" className="text-sm font-normal leading-snug text-muted-foreground">
           Keep me updated with product launches and seasonal bundles.
         </Label>

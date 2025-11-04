@@ -2,57 +2,102 @@
 
 import * as React from "react";
 
-import type { CheckoutAddress } from "@/lib/data/mock";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
-export interface CheckoutAddressProps {
-  addresses: CheckoutAddress[];
+export interface CheckoutAddressForm {
+  streetAddress: string;
+  suburb: string;
+  state: string;
+  postcode: string;
+  country: string;
+  instructions?: string;
 }
 
-export function CheckoutAddressSelector({ addresses }: CheckoutAddressProps) {
-  const [selected, setSelected] = React.useState(() => addresses.find((addr) => addr.isDefault)?.id ?? addresses[0]?.id);
+const DEFAULT_ADDRESS: CheckoutAddressForm = {
+  streetAddress: "",
+  suburb: "",
+  state: "",
+  postcode: "",
+  country: "Australia",
+  instructions: "",
+};
+
+export interface CheckoutAddressProps {
+  value?: CheckoutAddressForm;
+  onChange?: (value: CheckoutAddressForm) => void;
+}
+
+export function CheckoutAddressSelector({ value, onChange }: CheckoutAddressProps) {
+  const address = value ?? DEFAULT_ADDRESS;
+
+  const handleChange = (key: keyof CheckoutAddressForm) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const nextValue = event.target.value;
+    onChange?.({ ...address, [key]: nextValue });
+  };
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        {addresses.map((address) => {
-          const isActive = selected === address.id;
-          return (
-            <button
-              key={address.id}
-              type="button"
-              onClick={() => setSelected(address.id)}
-              className={cn(
-                "text-left",
-                "rounded-xl border p-4 transition",
-                isActive ? "border-primary ring-2 ring-primary/60" : "border-border/70 hover:border-primary/50",
-              )}
-            >
-              <p className="text-sm font-semibold text-foreground">{address.label}</p>
-              <p className="text-sm text-muted-foreground">{address.contactName}</p>
-              <p className="text-sm text-muted-foreground">{address.line1}</p>
-              {address.line2 ? <p className="text-sm text-muted-foreground">{address.line2}</p> : null}
-              <p className="text-sm text-muted-foreground">
-                {address.suburb}, {address.state} {address.postcode}
-              </p>
-              {address.instructions ? (
-                <p className="mt-2 text-xs text-muted-foreground">{address.instructions}</p>
-              ) : null}
-            </button>
-          );
-        })}
+      <div className="space-y-3">
+        <div className="space-y-2">
+          <Label htmlFor="address-line1">Street address</Label>
+          <Input
+            id="address-line1"
+            value={address.streetAddress}
+            onChange={handleChange("streetAddress")}
+            placeholder="123 Collins Street"
+          />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="address-suburb">Suburb</Label>
+            <Input
+              id="address-suburb"
+              value={address.suburb}
+              onChange={handleChange("suburb")}
+              placeholder="Melbourne"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="address-state">State</Label>
+            <Input
+              id="address-state"
+              value={address.state}
+              onChange={handleChange("state")}
+              placeholder="VIC"
+            />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-[1fr_1fr_1fr]">
+          <div className="space-y-2">
+            <Label htmlFor="address-postcode">Postcode</Label>
+            <Input
+              id="address-postcode"
+              value={address.postcode}
+              onChange={handleChange("postcode")}
+              placeholder="3000"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="address-country">Country</Label>
+            <Input
+              id="address-country"
+              value={address.country}
+              onChange={handleChange("country")}
+              placeholder="Australia"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="address-instructions">Delivery instructions (optional)</Label>
+          <Input
+            id="address-instructions"
+            value={address.instructions ?? ""}
+            onChange={handleChange("instructions")}
+            placeholder="Leave at reception if unattended"
+          />
+        </div>
       </div>
-      <Card className="border-dashed border-border/80">
-        <CardContent className="flex flex-col gap-2 p-6 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">Delivering somewhere else?</p>
-          <p>Save a new address to reuse on future orders.</p>
-          <Button variant="outline" size="sm" className="w-fit">
-            Add new address
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }

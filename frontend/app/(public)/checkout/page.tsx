@@ -1,139 +1,191 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Metadata } from "next";
-import { ArrowLeft, Lock, ShieldCheck } from "lucide-react";
 
-import { CheckoutStepper } from "@/components/checkout/checkout-stepper";
-import { CheckoutContactSection } from "@/components/checkout/checkout-contact";
-import { CheckoutAddressSelector } from "@/components/checkout/checkout-address";
-import { CheckoutShippingOptions } from "@/components/checkout/checkout-shipping";
-import { CheckoutPaymentSection } from "@/components/checkout/checkout-payment";
-import { CheckoutSupport } from "@/components/checkout/checkout-support";
-import { CartSummaryPanel } from "@/components/cart/cart-summary";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { mockCart, mockCheckout } from "@/lib/data/mock";
+import { CheckoutFlow, type CheckoutSubmissionPayload } from "@/components/checkout/checkout-flow";
+import { fetchCart } from "@/lib/api/cart";
+import { fetchProducts } from "@/lib/api/products";
+import { submitCheckout } from "@/lib/api/checkout";
+import { ApiError } from "@/lib/api/client";
 
 export const metadata: Metadata = {
   title: "Checkout | AWE Electronics",
   description: "Complete your order with secure payment and delivery options tailored for Australian customers.",
 };
 
-export default function CheckoutPage() {
+async function loadCart() {
+  try {
+    return await fetchCart();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export default async function CheckoutPage() {
+  const cart = await loadCart();
+
+  if (!cart || cart.items.length === 0) {
+    redirect("/cart");
+  }
+
+  const [productResults] = await Promise.all([
+    fetchProducts({ pageSize: 3 }).catch(() => ({ products: [] })),
+  ]);
+
+  const upsell = productResults.products.map((product) => ({
+    id: product.id,
+    name: product.name,
+    description: product.description ?? undefined,
+    href: `/products/${product.id}`,
+  }));
+
+  const cartMessages = [
+    "Orders over $200 qualify for complimentary express shipping across Australia.",
+    "Need tailored installation? Add a consultation at checkout to bundle professional services.",
+  ];
+
+  const supportMessages = [
+    {
+      title: "Need installation help?",
+      description: "Add professional setup and calibration in the next step.",
+      href: "/consultations",
+    },
+    {
+      title: "GST invoice required?",
+      description: "We issue ABN-compliant invoices instantly after payment.",
+    },
+  ];
+
+  const shippingOptions = [
+    {
+      id: "EXPRESS",
+      label: "Express courier",
+      description: "Insured overnight delivery from Melbourne warehouse",
+      eta: "Arrives in 1-2 business days",
+      price: 0,
+      recommended: true,
+    },
+    {
+      id: "STANDARD",
+      label: "Standard shipping",
+      description: "2-4 business days via Australia Post",
+      eta: "Arrives in 3-4 business days",
+      price: 15,
+    },
+  ] as const;
+
+  const paymentMethods = [
+    {
+      id: "CREDIT_CARD" as const,
+      label: "Credit or debit card",
+      hint: "Visa, Mastercard, and Amex accepted",
+    },
+    {
+      id: "PAYPAL" as const,
+      label: "PayPal",
+      hint: "Checkout with your PayPal account",
+    },
+    {
+      id: "BANK_TRANSFER" as const,
+      label: "Bank transfer",
+      hint: "EFT with 48-hour reservation",
+    },
+  ];
+
+  async function placeOrder(payload: CheckoutSubmissionPayload) {
+    "use server";
+
+    if (!payload.contact.firstName || !payload.contact.lastName || !payload.contact.email) {
+      return {
+        success: false,
+        message: "Please provide your name and email so we can confirm your order.",
+      };
+    }
+
+    if (!payload.address.streetAddress || !payload.address.suburb || !payload.address.state || !payload.address.postcode) {
+      return {
+        success: false,
+        message: "A complete delivery address is required to finalise your order.",
+      };
+    }
+
+    if (payload.paymentMethod === "CREDIT_CARD") {
+      if (!payload.cardDetails.cardNumber || !payload.cardDetails.cardExpiry || !payload.cardDetails.cardCvv) {
+        return {
+          success: false,
+          message: "Please add your card number, expiry, and security code to continue.",
+        };
+      }
+    }
+
+    if (payload.paymentMethod === "PAYPAL" && !payload.cardDetails.paypalEmail) {
+      return {
+        success: false,
+        message: "Enter your PayPal email so we can redirect you to complete payment.",
+      };
+    }
+
+    try {
+      const response = await submitCheckout({
+        shipping_method: payload.shippingMethod === "EXPRESS" ? "EXPRESS" : "STANDARD",
+        payment_method: payload.paymentMethod,
+        guest_email: payload.contact.email,
+        guest_first_name: payload.contact.firstName,
+        guest_last_name: payload.contact.lastName,
+        guest_phone: payload.contact.phone || undefined,
+        delivery_address: {
+          street_address: payload.address.streetAddress,
+          suburb: payload.address.suburb,
+          state: payload.address.state,
+          postcode: payload.address.postcode,
+          country: payload.address.country || "Australia",
+          is_default: false,
+        },
+        card_number: payload.paymentMethod === "CREDIT_CARD" ? payload.cardDetails.cardNumber : undefined,
+        card_expiry: payload.paymentMethod === "CREDIT_CARD" ? payload.cardDetails.cardExpiry : undefined,
+        card_cvv: payload.paymentMethod === "CREDIT_CARD" ? payload.cardDetails.cardCvv : undefined,
+        paypal_email: payload.paymentMethod === "PAYPAL" ? payload.cardDetails.paypalEmail : undefined,
+      });
+
+      return {
+        success: true,
+        orderNumber: response.order_number,
+        message: `Order ${response.order_number} placed successfully.`,
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const payloadDetail =
+          typeof error.payload === "object" && error.payload !== null && "detail" in error.payload
+            ? String((error.payload as { detail: unknown }).detail)
+            : undefined;
+
+        return {
+          success: false,
+          message: payloadDetail ?? "Checkout failed. Please review your details and try again.",
+        };
+      }
+
+      throw error;
+    }
+  }
+
   return (
-    <div className="space-y-12">
-      <div className="space-y-3 text-sm text-muted-foreground">
-        <Link href="/cart" className="inline-flex items-center gap-2 font-medium text-primary">
-          <ArrowLeft className="h-4 w-4" /> Return to cart
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Secure checkout</h1>
-          <Badge variant="secondary" className="gap-2">
-            <Lock className="h-3.5 w-3.5" /> AES-256 encrypted
-          </Badge>
-        </div>
-        <p>Review your details, choose delivery, and confirm payment to finalise your order.</p>
-        <CheckoutStepper currentStep={2} />
-      </div>
-
-      <div className="grid gap-10 xl:grid-cols-[1.5fr_0.5fr]">
-        <div className="space-y-8">
-          <Card className="border-border/80">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-lg">1. Contact details</CardTitle>
-              <p className="text-sm text-muted-foreground">We&apos;ll keep you updated on delivery milestones and installation scheduling.</p>
-            </CardHeader>
-            <CardContent>
-              <CheckoutContactSection contact={mockCheckout.contact} />
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/80">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-lg">2. Delivery address</CardTitle>
-              <p className="text-sm text-muted-foreground">Select where you&apos;d like us to ship or collect your order.</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <CheckoutAddressSelector addresses={mockCheckout.addresses} />
-
-              <div className="space-y-4">
-                <h3 className="text-base font-semibold text-foreground">Shipping options</h3>
-                <CheckoutShippingOptions options={mockCheckout.shippingOptions} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/80">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-lg">3. Payment method</CardTitle>
-              <p className="text-sm text-muted-foreground">Choose a payment method. You can save cards securely for future purchases.</p>
-            </CardHeader>
-            <CardContent>
-              <CheckoutPaymentSection methods={mockCheckout.paymentMethods} />
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/80">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-lg">4. Review &amp; confirm</CardTitle>
-              <p className="text-sm text-muted-foreground">Select “Place order” to finalise. You&apos;ll receive an email confirmation instantly.</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Order preferences</p>
-                <ul className="mt-2 list-disc space-y-1 pl-4">
-                  <li>Installation consult requested</li>
-                  <li>Include calibration report and personalised onboarding</li>
-                </ul>
-              </div>
-              <Button size="lg" className="w-full">
-                Place order now
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                By placing this order, you agree to our terms of sale and privacy policy. We&apos;ll never charge you until you confirm.
-              </p>
-            </CardContent>
-          </Card>
-
-          <CheckoutSupport messages={mockCheckout.support} />
-        </div>
-
-        <aside className="space-y-6 xl:sticky xl:top-28">
-          <CartSummaryPanel summary={mockCheckout.summary} messages={mockCart.messages} upsell={mockCart.upsell} />
-
-          <Card className="border-border/80 bg-primary/5">
-            <CardContent className="flex flex-col gap-3 p-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2 text-foreground">
-                <ShieldCheck className="h-4 w-4" />
-                Local support every step
-              </div>
-              <p>
-                Need adjustments before we ship? Our Melbourne-based team can tweak builds, add peripherals, and coordinate onsite setup.
-              </p>
-              <Button variant="outline" asChild className="w-fit">
-                <Link href="/support">Contact support</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </aside>
-      </div>
-
-      <Separator />
-
-      <section className="rounded-2xl border border-border/80 bg-card p-6">
-        <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <p className="text-base font-semibold text-foreground">Questions about finance or bulk orders?</p>
-            <p>
-              Schedule a call with an AWE business consultant to access corporate pricing, net terms, and deployment services.
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/consultations">Talk to sales</Link>
-          </Button>
-        </div>
-      </section>
-    </div>
+    <CheckoutFlow
+      cartSummary={{
+        subtotal: cart.subtotal,
+        estimatedShipping: cart.estimated_shipping,
+        estimatedTax: cart.estimated_tax,
+        estimatedTotal: cart.estimated_total,
+      }}
+      cartMessages={cartMessages}
+      upsell={upsell}
+      supportMessages={supportMessages}
+      shippingOptions={shippingOptions.map((option) => ({ ...option }))}
+      paymentMethods={paymentMethods}
+      onSubmit={placeOrder}
+    />
   );
 }

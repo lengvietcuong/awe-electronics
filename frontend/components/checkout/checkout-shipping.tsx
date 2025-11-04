@@ -2,7 +2,6 @@
 
 import * as React from "react";
 
-import type { ShippingOption } from "@/lib/data/mock";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -11,12 +10,41 @@ const formatter = new Intl.NumberFormat("en-AU", {
   currency: "AUD",
 });
 
-export interface CheckoutShippingProps {
-  options: ShippingOption[];
+export interface ShippingOption {
+  id: string;
+  label: string;
+  description: string;
+  eta: string;
+  price: number;
+  recommended?: boolean;
 }
 
-export function CheckoutShippingOptions({ options }: CheckoutShippingProps) {
-  const [selected, setSelected] = React.useState(() => options.find((option) => option.recommended)?.id ?? options[0]?.id);
+export interface CheckoutShippingProps {
+  options: ShippingOption[];
+  value?: string;
+  onChange?: (optionId: string) => void;
+}
+
+export function CheckoutShippingOptions({ options, value, onChange }: CheckoutShippingProps) {
+  const fallback = React.useMemo(
+    () => options.find((option) => option.recommended)?.id ?? options[0]?.id ?? null,
+    [options],
+  );
+
+  const [selected, setSelected] = React.useState<string | null>(value ?? fallback);
+
+  React.useEffect(() => {
+    if (value && value !== selected) {
+      setSelected(value);
+    }
+  }, [selected, value]);
+
+  React.useEffect(() => {
+    if (selected == null && fallback) {
+      setSelected(fallback);
+      onChange?.(fallback);
+    }
+  }, [fallback, onChange, selected]);
 
   return (
     <div className="space-y-3">
@@ -28,7 +56,10 @@ export function CheckoutShippingOptions({ options }: CheckoutShippingProps) {
           <button
             key={option.id}
             type="button"
-            onClick={() => setSelected(option.id)}
+            onClick={() => {
+              setSelected(option.id);
+              onChange?.(option.id);
+            }}
             className={cn(
               "w-full rounded-xl border p-4 text-left transition",
               "flex flex-col gap-2",

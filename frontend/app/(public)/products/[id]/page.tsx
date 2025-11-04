@@ -1,21 +1,23 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BadgeCheck, Package, ShieldCheck, Star, Truck } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Package, ShieldCheck, Truck } from "lucide-react";
 
-import { ProductGallery } from "@/components/product/product-gallery";
-import { KeyValueList } from "@/components/product/key-value-list";
-import { ProductHighlights } from "@/components/product/product-highlights";
 import { ProductCard } from "@/components/common/product-card";
+import { KeyValueList } from "@/components/product/key-value-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Select } from "@/components/ui/select";
-import {
-  DetailedProduct,
-  detailedProducts,
-} from "@/lib/data/mock";
+import { fetchProductById, fetchProducts } from "@/lib/api/products";
+import { ApiError } from "@/lib/api/client";
+import { formatStockStatus } from "@/lib/formatters";
+
+const priceFormatter = new Intl.NumberFormat("en-AU", {
+  style: "currency",
+  currency: "AUD",
+});
 
 interface ProductPageProps {
   params: {
@@ -23,237 +25,224 @@ interface ProductPageProps {
   };
 }
 
-const quantityOptions = Array.from({ length: 5 }, (_, index) => index + 1);
+async function loadProduct(productId: number) {
+  try {
+    return await fetchProductById(productId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      notFound();
+    }
 
-const priceFormatter = new Intl.NumberFormat("en-AU", {
-  style: "currency",
-  currency: "AUD",
-});
-
-function stockTone(status: string) {
-  const lower = status.toLowerCase();
-  if (lower.includes("low")) return "text-amber-600";
-  if (lower.includes("pre")) return "text-blue-600";
-  if (lower.includes("out")) return "text-rose-600";
-  return "text-emerald-600";
-}
-
-export function generateStaticParams() {
-  return Object.keys(detailedProducts).map((id) => ({ id }));
+    throw error;
+  }
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
-  const product = detailedProducts[params.id];
+  const productId = Number(params.id);
 
-  if (!product) {
+  if (Number.isNaN(productId)) {
     return {
       title: "Product not found | AWE Electronics",
     };
   }
 
-  return {
-    title: `${product.name} | AWE Electronics`,
-    description: product.summary,
-  };
+  try {
+    const product = await fetchProductById(productId);
+    return {
+      title: `${product.name} | AWE Electronics`,
+      description: product.description ?? `Explore ${product.name} from AWE Electronics.`,
+    };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return {
+        title: "Product not found | AWE Electronics",
+      };
+    }
+
+    throw error;
+  }
 }
 
-function ProductHero({ product }: { product: DetailedProduct }) {
-  return (
-    <section className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-      <ProductGallery images={product.gallery} name={product.name} />
-      <div className="space-y-6">
-        <div className="space-y-3">
-          <Badge variant="secondary" className="w-fit">
-            {product.category}
-          </Badge>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              {product.name}
-            </h1>
-            <span className={`text-2xl font-semibold sm:text-3xl`}>
-              {priceFormatter.format(product.price)}
-            </span>
-          </div>
-          <p className="max-w-2xl text-sm text-muted-foreground">{product.summary}</p>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            {typeof product.rating === "number" ? (
-              <span className="inline-flex items-center gap-1">
-                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                {product.rating.toFixed(1)}
-                {typeof product.reviews === "number" ? (
-                  <span className="text-xs">({product.reviews.toLocaleString()} reviews)</span>
-                ) : null}
-              </span>
-            ) : null}
-            <span className={`font-medium ${stockTone(product.stockStatus)}`}>
-              {product.stockStatus}
-            </span>
-          </div>
-        </div>
+function parseSpecifications(specifications: string | null) {
+  if (!specifications) return [];
 
-        <Card className="border-border/80">
-          <CardContent className="space-y-4 p-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground" htmlFor="quantity-select">
-                Quantity
-              </label>
-              <Select id="quantity-select" className="w-32" defaultValue="1" aria-label="Select quantity">
-                {quantityOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button className="flex-1">Add to cart</Button>
-              <Button variant="outline" className="flex-1" asChild>
-                <Link href="/consultations">Book consultation</Link>
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Truck className="h-4 w-4" />
-              {product.shipping.leadTime}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-primary/5">
-          <CardContent className="space-y-3 p-6 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2 text-foreground">
-              <BadgeCheck className="h-4 w-4" />
-              Included 3-year premium onsite warranty
-            </div>
-            <p>{product.warranty}</p>
-            <Link
-              href="/support/warranty"
-              className="text-sm font-medium text-primary transition-colors hover:text-primary/80"
-            >
-              View warranty terms
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    </section>
-  );
+  return specifications
+    .split(/[;,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-function ProductDetails({ product }: { product: DetailedProduct }) {
-  return (
-    <section className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
-      <div className="space-y-6">
-        <div className="space-y-3">
-          <h2 className="text-2xl font-semibold text-foreground">Built for demanding workflows</h2>
-          <p className="text-sm text-muted-foreground">{product.description}</p>
-        </div>
-        <ProductHighlights items={product.highlights} />
-      </div>
-      <Card className="h-fit border-border/80">
-        <CardHeader>
-          <CardTitle className="text-lg">Technical specifications</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <KeyValueList items={product.specifications} />
-        </CardContent>
-      </Card>
-    </section>
-  );
-}
+export default async function ProductPage({ params }: ProductPageProps) {
+  const productId = Number(params.id);
 
-function ProductExtras({ product }: { product: DetailedProduct }) {
-  return (
-    <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-      <Card className="border-border/80">
-        <CardHeader className="flex flex-row items-center gap-2">
-          <Package className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">What&apos;s in the box</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-            {product.inTheBox.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-      <Card className="border-border/80">
-        <CardHeader className="flex flex-row items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">Shipping &amp; services</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <div>
-            <p className="font-medium text-foreground">{product.shipping.leadTime}</p>
-            <ul className="mt-2 list-disc space-y-2 pl-5">
-              {product.shipping.details.map((detail) => (
-                <li key={detail}>{detail}</li>
-              ))}
-            </ul>
-          </div>
-          {product.services?.length ? (
-            <div className="space-y-3">
-              <p className="font-medium text-foreground">Premium services</p>
-              {product.services.map((service) => (
-                <div key={service.title} className="rounded-lg border border-border/60 bg-muted/30 p-3">
-                  <p className="text-sm font-medium text-foreground">{service.title}</p>
-                  <p className="text-xs text-muted-foreground">{service.description}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-    </section>
-  );
-}
-
-export default function ProductPage({ params }: ProductPageProps) {
-  const product = detailedProducts[params.id];
-
-  if (!product) {
+  if (Number.isNaN(productId)) {
     notFound();
   }
 
+  const product = await loadProduct(productId);
+  const statusLabel = formatStockStatus(product.is_available, product.is_low_stock);
+  const specs = parseSpecifications(product.specifications);
+
+  const detailItems = [
+    { label: "Brand", value: product.brand ?? "—" },
+    { label: "Model", value: product.model_number ?? "—" },
+    { label: "Category", value: product.category },
+    { label: "Available units", value: `${product.available_quantity}` },
+    { label: "Total stock", value: `${product.stock_quantity}` },
+  ];
+
+  const relatedResponse = await fetchProducts({
+    category: product.category,
+    pageSize: 4,
+  });
+
+  const relatedProducts = relatedResponse.products
+    .filter((item) => item.id !== product.id)
+    .slice(0, 3)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: item.price,
+      description: item.description ?? undefined,
+      stockStatus: formatStockStatus(item.is_available, item.is_low_stock),
+      href: `/products/${item.id}`,
+    }));
+
   return (
-    <div className="space-y-14">
-      <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Link href="/products" className="inline-flex items-center gap-2 font-medium text-primary">
-            <ArrowLeft className="h-4 w-4" /> Back to catalogue
-          </Link>
-        </div>
-        <p>Home / Products / {product.name}</p>
+    <div className="space-y-12">
+      <div className="space-y-2 text-sm text-muted-foreground">
+        <Link href="/products" className="inline-flex items-center gap-2 font-medium text-primary">
+          <ArrowLeft className="h-4 w-4" /> Back to catalogue
+        </Link>
+        <Badge variant="secondary" className="w-fit">
+          {product.category}
+        </Badge>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{product.name}</h1>
+        {product.description ? <p className="max-w-2xl text-base">{product.description}</p> : null}
       </div>
 
-      <ProductHero product={product} />
+      <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card className="border-border/80">
+          <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
+            {product.image_url ? (
+              <Image
+                src={product.image_url}
+                alt={product.name}
+                fill
+                className="object-cover"
+                sizes="(min-width: 1024px) 540px, 100vw"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                Image coming soon
+              </div>
+            )}
+          </div>
+        </Card>
 
-      <Separator />
+        <div className="space-y-6">
+          <Card className="border-border/80">
+            <CardContent className="space-y-4 p-6">
+              <div className="space-y-2">
+                <p className="text-3xl font-semibold text-foreground">
+                  {priceFormatter.format(product.price)}
+                </p>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">{statusLabel}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Truck className="h-4 w-4" /> Ships from Melbourne warehouse
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <BadgeCheck className="h-4 w-4" /> Local warranty included
+                  </span>
+                </div>
+              </div>
 
-      <ProductDetails product={product} />
+              <div className="space-y-3">
+                <Button size="lg" className="w-full">
+                  Add to cart
+                </Button>
+                <Button variant="outline" size="lg" className="w-full" asChild>
+                  <Link href="/checkout">Buy now</Link>
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Need help before buying? Call our specialists on{" "}
+                  <a href="tel:+61355501234" className="text-primary">
+                    (03) 5550 1234
+                  </a>{" "}
+                  or book a consultation.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-      <Separator />
-
-      <ProductExtras product={product} />
-
-      {product.relatedProducts?.length ? (
-        <section className="space-y-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-foreground">Recommended accessories</h2>
-              <p className="text-sm text-muted-foreground">
-                Pair your setup with gear curated by AWE specialists.
+          <Card className="border-border/80 bg-primary/5">
+            <CardContent className="space-y-4 p-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-foreground">
+                <ShieldCheck className="h-4 w-4" /> Delivery promise
+              </div>
+              <p>
+                We dispatch within 24 hours on business days. Express courier upgrades and installation services are
+                available at checkout.
               </p>
+              <div className="inline-flex items-center gap-2 text-primary">
+                <Package className="h-4 w-4" /> Free click &amp; collect available
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card className="border-border/80">
+          <CardHeader>
+            <CardTitle className="text-lg">Key details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <KeyValueList items={detailItems} />
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80">
+          <CardHeader>
+            <CardTitle className="text-lg">Specifications</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {specs.length ? (
+              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                {specs.map((spec) => (
+                  <li key={spec}>{spec}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Detailed specifications will be added shortly.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {relatedProducts.length ? (
+        <>
+          <Separator />
+          <section className="space-y-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold text-foreground">You might also like</h2>
+                <p className="text-sm text-muted-foreground">
+                  More {product.category.toLowerCase()} picks curated for Australian homes and offices.
+                </p>
+              </div>
             </div>
-            <Button variant="ghost" asChild>
-              <Link href="/products">View all products</Link>
-            </Button>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {product.relatedProducts.map((related) => (
-              <ProductCard key={related.id} {...related} />
-            ))}
-          </div>
-        </section>
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {relatedProducts.map((related) => (
+                <ProductCard key={related.id} {...related} />
+              ))}
+            </div>
+          </section>
+        </>
       ) : null}
     </div>
   );

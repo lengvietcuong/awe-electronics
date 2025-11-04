@@ -8,17 +8,33 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { mockCart } from "@/lib/data/mock";
+import { fetchCart } from "@/lib/api/cart";
+import { fetchProductById, fetchProducts } from "@/lib/api/products";
+import { ApiError } from "@/lib/api/client";
+import { formatStockStatus } from "@/lib/formatters";
 
 export const metadata: Metadata = {
   title: "Shopping Cart | AWE Electronics",
   description: "Review your selected products before heading to checkout.",
 };
 
-export default function CartPage() {
-  const hasItems = mockCart.items.length > 0;
+async function loadCart() {
+  try {
+    return await fetchCart();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
 
-  if (!hasItems) {
+    throw error;
+  }
+}
+
+export default async function CartPage() {
+  const cart = await loadCart();
+  const items = cart?.items ?? [];
+
+  if (items.length === 0) {
     return (
       <section className="space-y-6">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -44,6 +60,58 @@ export default function CartPage() {
     );
   }
 
+  const productDetails = await Promise.all(
+    items.map(async (item) => {
+      try {
+        const product = await fetchProductById(item.product_id);
+        return product;
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  const productMap = new Map<number, typeof productDetails[number]>();
+  productDetails.forEach((product) => {
+    if (product) {
+      productMap.set(product.id, product);
+    }
+  });
+
+  const cartItems = items.map((item) => {
+    const product = productMap.get(item.product_id);
+    return {
+      id: item.id,
+      productId: item.product_id,
+      name: product?.name ?? item.product_name,
+      unitPrice: item.product_price,
+      quantity: item.quantity,
+      category: product?.category,
+      imageUrl: product?.image_url,
+      stockStatus: product ? formatStockStatus(product.is_available, product.is_low_stock) : undefined,
+      availabilityMessage: product?.is_available
+        ? "Dispatches within 24 hours"
+        : "Currently unavailable",
+      href: `/products/${item.product_id}`,
+    };
+  });
+
+  const [highlightProducts] = await Promise.all([
+    fetchProducts({ pageSize: 3 }).catch(() => ({ products: [] })),
+  ]);
+
+  const upsell = highlightProducts.products.map((product) => ({
+    id: product.id,
+    name: product.name,
+    description: product.description ?? undefined,
+    href: `/products/${product.id}`,
+  }));
+
+  const helpfulMessages = [
+    "Orders over $200 qualify for complimentary express shipping across Australia.",
+    "Need tailored installation? Add a consultation at checkout to bundle professional services.",
+  ];
+
   return (
     <div className="space-y-10">
       <div className="space-y-2 text-sm text-muted-foreground">
@@ -58,13 +126,13 @@ export default function CartPage() {
         <section className="space-y-6">
           <Card className="border-border/80">
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Items ({mockCart.items.length})</CardTitle>
+              <CardTitle className="text-lg">Items ({cartItems.length})</CardTitle>
               <Badge variant="outline" className="text-xs font-normal">
                 Secured checkout with AES-256 encryption
               </Badge>
             </CardHeader>
             <CardContent className="space-y-6">
-              {mockCart.items.map((item) => (
+              {cartItems.map((item) => (
                 <CartLineItem key={item.id} item={item} />
               ))}
             </CardContent>
@@ -88,9 +156,14 @@ export default function CartPage() {
 
         <aside className="lg:sticky lg:top-28">
           <CartSummaryPanel
-            summary={mockCart.summary}
-            messages={mockCart.messages}
-            upsell={mockCart.upsell}
+            summary={{
+              subtotal: cart?.subtotal ?? 0,
+              estimatedShipping: cart?.estimated_shipping ?? 0,
+              estimatedTax: cart?.estimated_tax ?? 0,
+              estimatedTotal: cart?.estimated_total ?? 0,
+            }}
+            messages={helpfulMessages}
+            upsell={upsell}
           />
         </aside>
       </div>

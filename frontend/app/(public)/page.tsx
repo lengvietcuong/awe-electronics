@@ -9,12 +9,8 @@ import { FeatureCard } from "@/components/common/feature-card";
 import { MetricCard } from "@/components/common/metric-card";
 import { ProductCard } from "@/components/common/product-card";
 import { TestimonialCard } from "@/components/common/testimonial-card";
-import {
-  featuredCategories,
-  featuredProducts,
-  sellingPoints,
-  testimonials,
-} from "@/lib/data/mock";
+import { fetchProductCategories, fetchProducts } from "@/lib/api/products";
+import { formatStockStatus } from "@/lib/formatters";
 
 const heroMetrics = [
   { value: "200+", label: "Brands stocked", helper: "Curated for Australian homes" },
@@ -28,7 +24,86 @@ const featureIcons = [
   <Headphones key="headphones" className="h-5 w-5" />,
 ];
 
-export default function HomePage() {
+const sellingPoints = [
+  {
+    title: "Australia-wide next day dispatch",
+    description:
+      "Orders placed before 2pm ship the same day from our Melbourne warehouse.",
+  },
+  {
+    title: "Expert advice, real people",
+    description:
+      "Talk to accredited product specialists via chat, phone, or in-store.",
+  },
+  {
+    title: "Genuine local warranty",
+    description:
+      "Every product includes local warranty coverage with hassle-free support.",
+  },
+];
+
+const testimonials = [
+  {
+    name: "Samuel, Perth",
+    quote:
+      "Best online buying experience I have had. The gaming rig arrived calibrated with a handwritten setup guide.",
+  },
+  {
+    name: "Priya, Brisbane",
+    quote:
+      "Their smart home consultation saved us hours. Everything just works and support was immediate.",
+  },
+  {
+    name: "Melissa, Melbourne",
+    quote:
+      "Click and collect was ready in 30 minutes. Staff were incredibly helpful with accessories.",
+  },
+];
+
+const categoryDescriptions: Record<string, string> = {
+  Audio: "Headphones, speakers, and studio gear handpicked by our acoustic team.",
+  Computing: "Laptops, desktops, and accessories tuned for Australian workflows.",
+  Gaming: "High-refresh displays, RTX rigs, and peripherals built for marathon sessions.",
+  "Smart Home": "Automate climate, lighting, and security with partner installers ready to help.",
+  Entertainment: "Cinematic TVs, projectors, and surround sound bundles for any space.",
+};
+
+function slugifyCategory(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function describeCategory(name: string) {
+  return (
+    categoryDescriptions[name] ?? `Explore the latest ${name.toLowerCase()} releases curated by our specialists.`
+  );
+}
+
+
+export default async function HomePage() {
+  const [productList, categories] = await Promise.all([
+    fetchProducts({ pageSize: 3 }),
+    fetchProductCategories(),
+  ]);
+
+  const categoryCards = categories.slice(0, 4).map((name) => ({
+    slug: name,
+    name,
+    description: describeCategory(name),
+  }));
+
+  const highlightProducts = productList.products.slice(0, 3).map((product) => ({
+    id: product.id,
+    name: product.name,
+    category: product.category,
+    price: product.price,
+    description: product.description ?? undefined,
+    stockStatus: formatStockStatus(product.is_available, product.is_low_stock),
+    href: `/products/${product.id}`,
+  }));
+
   return (
     <div className="space-y-16">
       <section className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
@@ -96,16 +171,16 @@ export default function HomePage() {
           </Button>
         </div>
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {featuredCategories.map((category) => (
-            <CategoryCard key={category.slug} {...category} />
+          {categoryCards.map((category) => (
+            <CategoryCard key={slugifyCategory(category.name)} {...category} />
           ))}
         </div>
       </section>
 
       <section className="space-y-8">
-  <h2 className="text-2xl font-semibold text-foreground">This week&apos;s highlights</h2>
+        <h2 className="text-2xl font-semibold text-foreground">This week&apos;s highlights</h2>
         <div className="grid gap-6 lg:grid-cols-3">
-          {featuredProducts.map((product) => (
+          {highlightProducts.map((product) => (
             <ProductCard key={product.id} {...product} />
           ))}
         </div>

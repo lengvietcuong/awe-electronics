@@ -1,7 +1,12 @@
 import Link from "next/link";
 
-import type { CheckoutSupportMessage } from "@/lib/data/mock";
 import { Card, CardContent } from "@/components/ui/card";
+
+export interface CheckoutSupportMessage {
+  title: string;
+  description: string;
+  href?: string;
+}
 
 export interface CheckoutSupportProps {
   messages: CheckoutSupportMessage[];

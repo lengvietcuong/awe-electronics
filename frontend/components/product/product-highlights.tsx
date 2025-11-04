@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { ProductHighlight } from "@/lib/data/mock";
+export interface ProductHighlight {
+  title: string;
+  description: string;
+}
 
 export interface ProductHighlightsProps {
   items: ProductHighlight[];

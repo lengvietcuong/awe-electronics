@@ -32,11 +32,12 @@ export function RadioGroup({
   return (
     <div className={cn("grid gap-2", className)} {...props}>
       {React.Children.map(children, (child) => {
-        if (!React.isValidElement(child)) return child;
+        if (!React.isValidElement<RadioProps>(child)) return child;
+        const childValue = (child.props as any).value;
         return React.cloneElement(child, {
-          checked: child.props.value === currentValue,
-          onChange: () => handleChange(child.props.value),
-        });
+          checked: childValue === currentValue,
+          onChange: () => handleChange(childValue),
+        } as Partial<RadioProps>);
       })}
     </div>
   );

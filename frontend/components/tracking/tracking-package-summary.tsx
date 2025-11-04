@@ -1,10 +1,22 @@
-import type { CartSummary, OrderPackageItem } from "@/lib/data/mock";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+export interface TrackingPackageItem {
+  name: string;
+  quantity: number;
+  sku?: string | null;
+}
+
+export interface TrackingCostSummary {
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+}
+
 export interface TrackingPackageSummaryProps {
-  items: OrderPackageItem[];
-  summary: CartSummary;
+  items: TrackingPackageItem[];
+  summary: TrackingCostSummary;
   notes?: string[];
 }
 
