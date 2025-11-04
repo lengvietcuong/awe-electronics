@@ -45,12 +45,20 @@ def checkout(
     customer = None
     cart = None
 
+    print(
+        f"[Checkout] current_account: {current_account.email if current_account else 'None (guest)'}"
+    )
+    print(f"[Checkout] session_id: {session_id}")
+
     if current_account:
         # Registered customer
         customer = CustomerAccountManager.get_customer_by_account(db, current_account)
         if not customer:
             raise HTTPException(status_code=404, detail="Customer profile not found")
 
+        print(
+            f"[Checkout] Using registered customer: ID={customer.id}, email={customer.email}"
+        )
         cart = ShoppingCartManager.get_or_create_cart(db, customer_id=customer.id)
     else:
         # Guest checkout
@@ -79,6 +87,10 @@ def checkout(
             checkout_data.guest_first_name,
             checkout_data.guest_last_name,
             checkout_data.guest_phone,
+        )
+
+        print(
+            f"[Checkout] Created guest customer: ID={customer.id}, email={customer.email}"
         )
 
         # Update cart to associate it with the guest customer
@@ -119,6 +131,10 @@ def checkout(
             db, cart, delivery_address, checkout_data.shipping_method, customer
         )
 
+        print(
+            f"[Checkout] Created order: ID={order.id}, number={order.order_number}, customer_id={order.customer_id}"
+        )
+
         # Process payment
         payment_details = {}
         if checkout_data.payment_method.value == "CREDIT_CARD":
@@ -144,8 +160,9 @@ def checkout(
         NotificationService.send_order_confirmation(db, order)
         NotificationService.send_payment_confirmation(db, order)
 
-        # Clear cart
-        ShoppingCartManager.clear_cart(db, cart.id)
+        # Note: Don't clear cart here - let the frontend clear it after showing success modal
+        # This prevents race conditions where the cart is empty before the modal shows
+        # ShoppingCartManager.clear_cart(db, cart.id)
 
         # Refresh and return order
         db.refresh(order)

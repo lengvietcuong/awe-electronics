@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { ArrowUpRight, Star } from "lucide-react";
+import { Star } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
 
@@ -36,6 +35,7 @@ export function ProductCard({
   imageUrl,
   href = `/products/${id}`,
 }: ProductCardProps) {
+  const router = useRouter();
   const stockTone = stockStatus
     ? stockStatus.toLowerCase().includes("low")
       ? "text-amber-600"
@@ -44,8 +44,20 @@ export function ProductCard({
         : "text-emerald-600"
     : "text-muted-foreground";
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on the Add to Cart button
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) {
+      return;
+    }
+    router.push(href);
+  };
+
   return (
-    <Card className="flex h-full flex-col border-border/80">
+    <Card 
+      className="flex h-full flex-col border-border/80 cursor-pointer transition-shadow hover:shadow-md" 
+      onClick={handleCardClick}
+    >
       {imageUrl ? (
         <div className="relative aspect-video w-full overflow-hidden rounded-t-lg border-b border-border/80 bg-muted">
           <Image
@@ -76,21 +88,18 @@ export function ProductCard({
             </div>
           ) : null}
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-lg font-semibold">${price.toLocaleString()}</span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold">${price.toLocaleString()}</span>
+            {stockStatus ? (
+              <span className={`text-sm font-medium ${stockTone}`}>{stockStatus}</span>
+            ) : null}
+          </div>
           {badge ? <Badge variant="secondary">{badge}</Badge> : null}
         </div>
       </CardHeader>
       <CardContent className="mt-auto flex flex-col gap-3">
-        {stockStatus ? (
-          <span className={`text-sm font-medium ${stockTone}`}>{stockStatus}</span>
-        ) : null}
-        <Button asChild>
-          <Link href={href}>
-            View details <ArrowUpRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
-        <AddToCartButton productId={Number(id)} variant="outline" />
+        <AddToCartButton productId={Number(id)} variant="default" />
       </CardContent>
     </Card>
   );

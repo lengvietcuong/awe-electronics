@@ -166,14 +166,14 @@ export default async function CheckoutPage() {
 
       try {
         await clearCart();
+        // Revalidate the cart page and layout to update the cart count in the header
+        revalidatePath("/cart");
+        revalidatePath("/", "layout");
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 404)) {
           console.error("Failed to clear cart after checkout:", error);
         }
       }
-
-      revalidatePath("/orders");
-      revalidatePath("/", "layout");
 
       return {
         success: true,

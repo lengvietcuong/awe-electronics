@@ -3,12 +3,15 @@
 import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
+import { Minus, Plus, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
+import { updateCartItemQuantity, removeCartItem } from "@/lib/actions/cart";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
-const quantityOptions = Array.from({ length: 10 }, (_, index) => index + 1);
+const MIN_QUANTITY = 1;
+const MAX_QUANTITY = 10;
 
 export interface CartLineItemData {
   id: number;
@@ -25,22 +28,54 @@ export interface CartLineItemData {
 
 export interface CartLineItemProps {
   item: CartLineItemData;
-  onQuantityChange?: (itemId: number, quantity: number) => void;
-  onRemove?: (itemId: number) => void;
-  onSaveForLater?: (itemId: number) => void;
 }
 
-export function CartLineItem({ item, onQuantityChange, onRemove, onSaveForLater }: CartLineItemProps) {
+export function CartLineItem({ item }: CartLineItemProps) {
   const [quantity, setQuantity] = React.useState(item.quantity);
+  const router = useRouter();
+  const [isUpdatingQuantity, startUpdateTransition] = React.useTransition();
+  const [isRemoving, startRemoveTransition] = React.useTransition();
 
   React.useEffect(() => {
     setQuantity(item.quantity);
   }, [item.quantity]);
 
   const handleQuantityChange = (nextQuantity: number) => {
+    if (nextQuantity < MIN_QUANTITY || nextQuantity > MAX_QUANTITY || nextQuantity === quantity) {
+      return;
+    }
+
     setQuantity(nextQuantity);
-    onQuantityChange?.(item.id, nextQuantity);
+    startUpdateTransition(async () => {
+      const result = await updateCartItemQuantity(item.id, nextQuantity);
+
+      if (!result?.success) {
+        setQuantity(item.quantity);
+        console.error(result?.error ?? "Failed to update quantity");
+        return;
+      }
+
+      router.refresh();
+    });
   };
+
+  const handleRemove = () => {
+    startRemoveTransition(async () => {
+      const result = await removeCartItem(item.id);
+
+      if (!result?.success) {
+        console.error(result?.error ?? "Failed to remove cart item");
+        return;
+      }
+
+      router.refresh();
+    });
+  };
+
+  const decrementQuantity = () => handleQuantityChange(quantity - 1);
+  const incrementQuantity = () => handleQuantityChange(quantity + 1);
+
+  const isBusy = isUpdatingQuantity || isRemoving;
 
   const priceDisplay = React.useMemo(
     () =>
@@ -86,37 +121,42 @@ export function CartLineItem({ item, onQuantityChange, onRemove, onSaveForLater 
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             {item.stockStatus ? <span className="font-medium text-foreground">{item.stockStatus}</span> : null}
             <div className="flex items-center gap-2">
-              <label htmlFor={`quantity-${item.id}`} className="text-xs">
-                Qty
-              </label>
-              <Select
-                id={`quantity-${item.id}`}
-                value={String(quantity)}
-                onChange={(event) => handleQuantityChange(Number(event.target.value))}
-                className="w-20"
-                aria-label={`Update quantity for ${item.name}`}
-              >
-                {quantityOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </Select>
+              <span className="text-xs">Qty</span>
+              <div className="flex items-center gap-1 rounded-md border border-border/70">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-none"
+                  onClick={decrementQuantity}
+                  disabled={quantity <= MIN_QUANTITY || isBusy}
+                  aria-label={`Decrease quantity for ${item.name}`}
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </Button>
+                <span className="w-8 text-center text-sm font-medium text-foreground">{quantity}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-none"
+                  onClick={incrementQuantity}
+                  disabled={quantity >= MAX_QUANTITY || isBusy}
+                  aria-label={`Increase quantity for ${item.name}`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs font-normal"
-              onClick={() => onSaveForLater?.(item.id)}
+              className="flex items-center gap-1 text-xs font-normal text-rose-600 hover:text-rose-700"
+              onClick={handleRemove}
+              disabled={isRemoving}
+              aria-label={`Remove ${item.name} from cart`}
             >
-              Save for later
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs font-normal text-rose-600 hover:text-rose-700"
-              onClick={() => onRemove?.(item.id)}
-            >
+              <Trash2 className="h-3.5 w-3.5" />
               Remove
             </Button>
           </div>

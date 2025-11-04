@@ -149,9 +149,16 @@ export function CheckoutFlow({
     });
   };
 
-  const closeSuccessModal = () => {
+  const closeSuccessModal = async () => {
     setShowSuccessModal(false);
-    window.location.href = "/orders";
+    // Redirect logged-in users to orders page, guest users to order tracking
+    if (currentUser) {
+      window.location.href = "/orders";
+    } else if (successState?.orderNumber) {
+      window.location.href = `/order-tracking?order=${successState.orderNumber}`;
+    } else {
+      window.location.href = "/";
+    }
   };
 
   return (
@@ -192,12 +199,24 @@ export function CheckoutFlow({
               <Button variant="ghost" onClick={closeSuccessModal} className="w-full sm:w-auto">
                 Close
               </Button>
-              <Button asChild variant="outline" className="w-full sm:w-auto">
-                <Link href="/order-tracking">Track delivery</Link>
-              </Button>
-              <Button asChild className="w-full sm:w-auto">
-                <Link href="/orders">View orders</Link>
-              </Button>
+              {successState.orderNumber ? (
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                  <Link href={`/order-tracking?order=${successState.orderNumber}`}>Track delivery</Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                  <Link href="/order-tracking">Track delivery</Link>
+                </Button>
+              )}
+              {currentUser ? (
+                <Button asChild className="w-full sm:w-auto">
+                  <Link href="/orders">View orders</Link>
+                </Button>
+              ) : (
+                <Button asChild className="w-full sm:w-auto">
+                  <Link href={successState.orderNumber ? `/order-tracking?order=${successState.orderNumber}` : "/order-tracking"}>View order</Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -211,7 +230,7 @@ export function CheckoutFlow({
           <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Secure checkout</h1>
           <Badge variant="secondary" className="gap-2">
-            <Lock className="h-3.5 w-3.5" /> AES-256 encrypted
+            <Lock className="h-3.5 w-3.5" /> Payment details protected
           </Badge>
         </div>
         <p>Review your details, choose delivery, and confirm payment to finalise your order.</p>

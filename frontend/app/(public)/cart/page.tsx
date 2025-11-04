@@ -128,7 +128,7 @@ export default async function CartPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Items ({cartItems.length})</CardTitle>
               <Badge variant="outline" className="text-xs font-normal">
-                Secured checkout with AES-256 encryption
+                Secure checkout with bank-level protection
               </Badge>
             </CardHeader>
             <CardContent className="space-y-6">

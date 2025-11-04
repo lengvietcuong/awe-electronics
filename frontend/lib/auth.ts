@@ -10,7 +10,6 @@ const AUTH_TOKEN_COOKIE_NAME = "awe-auth-token";
 export async function getAuthTokenServer(): Promise<string | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_TOKEN_COOKIE_NAME)?.value;
-  console.log("[Auth Server] Token from cookie:", token ? `${token.substring(0, 20)}...` : "null");
   return token ?? null;
 }
 

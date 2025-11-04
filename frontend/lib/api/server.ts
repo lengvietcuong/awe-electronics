@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 
 import { SESSION_COOKIE_NAME } from "./config";
 import { apiFetch as apiFetchClient, type ApiRequestOptions } from "./client";
+import { getAuthTokenServer } from "../auth";
 
 export async function getSessionId() {
   const cookieStore = await cookies();
@@ -31,5 +32,12 @@ export async function setSessionCookie(sessionId: string) {
 
 export async function apiFetch<TResponse>(path: string, options: ApiRequestOptions = {}): Promise<TResponse> {
   const sessionId = await getSessionId();
-  return apiFetchClient<TResponse>(path, { ...options, sessionId });
+  const token = await getAuthTokenServer();
+  
+  // Include auth token if available (for authenticated requests)
+  return apiFetchClient<TResponse>(path, { 
+    ...options, 
+    sessionId,
+    token: token ?? undefined,
+  });
 }

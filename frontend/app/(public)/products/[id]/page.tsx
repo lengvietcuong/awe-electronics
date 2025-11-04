@@ -7,13 +7,13 @@ import { ArrowLeft, BadgeCheck, Package, ShieldCheck, Truck } from "lucide-react
 import { ProductCard } from "@/components/common/product-card";
 import { KeyValueList } from "@/components/product/key-value-list";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { fetchProductById, fetchProducts } from "@/lib/api/products";
 import { ApiError } from "@/lib/api/client";
 import { formatStockStatus } from "@/lib/formatters";
 import { AddToCartButton } from "@/components/product/add-to-cart-button";
+import { BuyNowButton } from "@/components/product/buy-now-button";
 
 const priceFormatter = new Intl.NumberFormat("en-AU", {
   style: "currency",
@@ -165,9 +165,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
               <div className="space-y-3">
                 <AddToCartButton productId={product.id} size="lg" className="w-full" />
-                <Button variant="outline" size="lg" className="w-full" asChild>
-                  <Link href="/checkout">Buy now</Link>
-                </Button>
+                <BuyNowButton productId={product.id} />
                 <p className="text-xs text-muted-foreground">
                   Need help before buying? Call our specialists on{" "}
                   <a href="tel:+61355501234" className="text-primary">
