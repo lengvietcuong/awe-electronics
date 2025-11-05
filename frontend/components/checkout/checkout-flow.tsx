@@ -34,7 +34,7 @@ export interface CheckoutFlowProps {
   shippingOptions: ShippingOption[];
   paymentMethods: PaymentMethodOption[];
   onSubmit: (payload: CheckoutSubmissionPayload) => Promise<{ success: boolean; orderNumber?: string; message?: string }>;
-  currentUser?: { id: number; email: string; first_name?: string | null; last_name?: string | null; phone?: string | null } | null;
+  currentUser?: { id: number; email: string; first_name: string; last_name: string; phone?: string | null } | null;
 }
 
 const EMPTY_CONTACT: CheckoutContactForm = {
@@ -78,8 +78,8 @@ export function CheckoutFlow({
   const initialContact = React.useMemo(() => {
     if (currentUser) {
       return {
-        firstName: currentUser.first_name || "",
-        lastName: currentUser.last_name || "",
+        firstName: currentUser.first_name,
+        lastName: currentUser.last_name,
         email: currentUser.email,
         phone: currentUser.phone || "",
         marketingOptIn: false,
@@ -199,13 +199,22 @@ export function CheckoutFlow({
               <Button variant="ghost" onClick={closeSuccessModal} className="w-full sm:w-auto">
                 Close
               </Button>
+              {successState.orderNumber ? (
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                  <Link href={`/order-tracking?order=${successState.orderNumber}`}>Track delivery</Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                  <Link href="/order-tracking">Track delivery</Link>
+                </Button>
+              )}
               {currentUser ? (
                 <Button asChild className="w-full sm:w-auto">
                   <Link href="/orders">View orders</Link>
                 </Button>
               ) : (
                 <Button asChild className="w-full sm:w-auto">
-                  <Link href={successState.orderNumber ? `/order-tracking?order=${successState.orderNumber}` : "/order-tracking"}>Track order</Link>
+                  <Link href={successState.orderNumber ? `/order-tracking?order=${successState.orderNumber}` : "/order-tracking"}>View order</Link>
                 </Button>
               )}
             </div>

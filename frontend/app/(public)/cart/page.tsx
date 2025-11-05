@@ -94,7 +94,7 @@ export default async function CartPage() {
         : "Currently unavailable",
       href: `/products/${item.product_id}`,
     };
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   const [highlightProducts] = await Promise.all([
     fetchProducts({ pageSize: 3 }).catch(() => ({ products: [] })),

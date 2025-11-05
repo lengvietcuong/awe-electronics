@@ -2,27 +2,36 @@ import { redirect } from "next/navigation";
 import {
   ArrowDownRight,
   ArrowUpRight,
-  BarChart2,
-  Boxes,
   LineChart,
+  PackageSearch,
+  ShoppingBag,
   TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 
 import { getCurrentUserServer } from "@/lib/api/auth.server";
-import { fetchQuickStats, fetchSalesReport, fetchInventoryReport } from "@/lib/api/admin/reports";
-import type { ApiQuickStats, ApiSalesReport, ApiInventoryReport } from "@/lib/types/api";
+import { fetchSalesReport } from "@/lib/api/admin/reports";
+import type { ApiSalesReport } from "@/lib/types/api";
 import { ApiError } from "@/lib/api/client";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { SalesTrendChart } from "@/components/dashboard/sales-trend-chart";
+import { ExportButtons } from "@/components/dashboard/export-buttons";
+import { TimeRangeSelect } from "@/components/dashboard/time-range-select";
+import { TopProductsVisualisation } from "@/components/dashboard/top-products-visualisation";
+
+export const dynamic = "force-dynamic";
+
+const RANGE_OPTIONS = [
+  { value: "today", label: "Today" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "365d", label: "Last 365 days" },
+  { value: "all", label: "All time" },
+] as const;
+
+type RangeValue = (typeof RANGE_OPTIONS)[number]["value"];
 
 function describeError(error: unknown) {
   if (error instanceof ApiError) {
@@ -38,13 +47,39 @@ function describeError(error: unknown) {
   return "Something went wrong while loading data.";
 }
 
-function computeDefaultPeriod() {
+function resolvePeriod(range: RangeValue) {
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const end = new Date(now);
   const start = new Date(now);
-  start.setDate(now.getDate() - 29);
+
+  switch (range) {
+    case "today":
+      break;
+    case "7d":
+      start.setDate(end.getDate() - 6);
+      break;
+    case "30d":
+      start.setDate(end.getDate() - 29);
+      break;
+    case "90d":
+      start.setDate(end.getDate() - 89);
+      break;
+    case "365d":
+      start.setDate(end.getDate() - 364);
+      break;
+    case "all":
+      start.setFullYear(end.getFullYear() - 10);
+      start.setMonth(0, 1);
+      break;
+    default:
+      start.setDate(end.getDate() - 29);
+      break;
+  }
 
   const startDate = start.toISOString().slice(0, 10);
-  const endDate = now.toISOString().slice(0, 10);
+  const endDate = end.toISOString().slice(0, 10);
 
   return { startDate, endDate };
 }
@@ -79,43 +114,32 @@ function ChangeBadge({ value }: { value: number | null | undefined }) {
   );
 }
 
-export default async function ManagerPage() {
+function getRangeValue(param?: string): RangeValue {
+  if (RANGE_OPTIONS.some((option) => option.value === param)) {
+    return param as RangeValue;
+  }
+  return "30d";
+}
+
+export default async function ManagerPage(props: {
+  searchParams?: Promise<{ range?: string }>;
+}) {
   const user = await getCurrentUserServer();
   if (user.role !== "manager") {
     redirect("/staff");
   }
 
-  const period = computeDefaultPeriod();
-  const apiBaseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    process.env.BACKEND_API_BASE_URL ||
-    "http://localhost:8000/api";
+  const searchParams = await props.searchParams;
+  const range = getRangeValue(searchParams?.range);
+  const period = resolvePeriod(range);
 
-  const salesExportHref =
-    `${apiBaseUrl}/admin/reports/sales/export?start_date=${period.startDate}` +
-    `&end_date=${period.endDate}&format=csv`;
-  const inventoryExportHref = `${apiBaseUrl}/admin/reports/inventory/export?format=csv`;
+  const [salesReportResult] = await Promise.allSettled([
+    fetchSalesReport({ ...period, comparePrevious: true }),
+  ]);
 
-  const [quickStatsResult, salesReportResult, inventoryReportResult] =
-    await Promise.allSettled([
-      fetchQuickStats(),
-      fetchSalesReport({ ...period, comparePrevious: true }),
-      fetchInventoryReport(),
-    ]);
-
-  let quickStats: ApiQuickStats | null = null;
   let salesReport: ApiSalesReport | null = null;
-  let inventoryReport: ApiInventoryReport | null = null;
 
-  let quickStatsError: string | null = null;
   let salesReportError: string | null = null;
-  let inventoryReportError: string | null = null;
-
-  if (quickStatsResult.status === "fulfilled") {
-    quickStats = quickStatsResult.value;
-  } else {
-    quickStatsError = describeError(quickStatsResult.reason);
-  }
 
   if (salesReportResult.status === "fulfilled") {
     salesReport = salesReportResult.value;
@@ -123,122 +147,60 @@ export default async function ManagerPage() {
     salesReportError = describeError(salesReportResult.reason);
   }
 
-  if (inventoryReportResult.status === "fulfilled") {
-    inventoryReport = inventoryReportResult.value;
-  } else {
-    inventoryReportError = describeError(inventoryReportResult.reason);
-  }
-
   const greetingName = user.first_name || user.email;
 
   return (
     <div className="flex flex-col gap-10">
       <section className="space-y-3">
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-            Performance console
-          </p>
-          <h1 className="text-3xl font-bold text-slate-900">
-            Welcome back, {greetingName}
-          </h1>
-          <p className="max-w-3xl text-sm text-slate-600">
-            Track sales momentum, spot inventory risks, and keep leadership informed with live data covering the last 30 days.
-          </p>
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+              Performance console
+            </p>
+            <h1 className="text-3xl font-bold text-slate-900">
+              Welcome back, {greetingName}
+            </h1>
+            <p className="max-w-3xl text-sm text-slate-600">
+              Track sales momentum, spot growth opportunities, and stay aligned with your leadership goals for the selected time range.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-500">
+              Time range
+            </p>
+            <TimeRangeSelect options={RANGE_OPTIONS} value={range} />
+          </div>
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-slate-200 bg-white text-slate-900">
-          <CardHeader className="space-y-1 pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
-              Today&apos;s sales
-            </CardTitle>
-            <TrendingUp className="h-5 w-5 text-slate-600" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {quickStats ? (
-              <div className="space-y-1">
-                <p className="text-3xl font-semibold">
-                  {formatCurrency(quickStats.today.total_sales)}
-                </p>
-                <p className="text-xs text-slate-600">
-                  {formatNumber(quickStats.today.total_orders)} orders today
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-600">{quickStatsError ?? "Loading…"}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white text-slate-900">
-          <CardHeader className="space-y-1 pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
-              This week
-            </CardTitle>
-            <BarChart2 className="h-5 w-5 text-slate-600" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {quickStats ? (
-              <div className="space-y-1">
-                <p className="text-3xl font-semibold">
-                  {formatCurrency(quickStats.this_week.total_sales)}
-                </p>
-                <p className="text-xs text-slate-600">
-                  {formatNumber(quickStats.this_week.total_orders)} orders secured
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-600">{quickStatsError ?? "Loading…"}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white text-slate-900">
-          <CardHeader className="space-y-1 pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
-              This month
-            </CardTitle>
-            <Boxes className="h-5 w-5 text-slate-600" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {quickStats ? (
-              <div className="space-y-2">
-                <p className="text-3xl font-semibold">
-                  {formatCurrency(quickStats.this_month.total_sales)}
-                </p>
-                <p className="text-xs text-slate-600">
-                  {formatNumber(quickStats.this_month.total_orders)} orders · Average {formatCurrency(quickStats.this_month.average_order_value)}
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-600">{quickStatsError ?? "Loading…"}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white text-slate-900">
-          <CardHeader className="space-y-1 pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
-              Inventory alerts
-            </CardTitle>
-            <Boxes className="h-5 w-5 text-slate-600" aria-hidden />
-          </CardHeader>
-          <CardContent>
-            {quickStats ? (
-              <div className="space-y-1">
-                <p className="text-3xl font-semibold">
-                  {formatNumber(quickStats.inventory.low_stock_alerts)}
-                </p>
-                <p className="text-xs text-slate-600">
-                  Low stock · {formatNumber(quickStats.inventory.out_of_stock)} out of stock
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-600">{quickStatsError ?? "Loading…"}</p>
-            )}
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Total revenue"
+          icon={TrendingUp}
+          value={salesReport ? formatCurrency(salesReport.total_sales) : "—"}
+          description={salesReport ? `${formatNumber(salesReport.total_orders)} orders` : salesReportError ?? "Loading…"}
+          change={salesReport?.comparison?.sales_change_percent}
+        />
+        <MetricCard
+          title="Total orders"
+          icon={ShoppingBag}
+          value={salesReport ? formatNumber(salesReport.total_orders) : "—"}
+          description={salesReport ? `Avg value ${formatCurrency(salesReport.average_order_value)}` : salesReportError ?? "Loading…"}
+          change={salesReport?.comparison?.orders_change_percent}
+        />
+        <MetricCard
+          title="Average order"
+          icon={LineChart}
+          value={salesReport ? formatCurrency(salesReport.average_order_value) : "—"}
+          description={salesReport ? `Revenue / order` : salesReportError ?? "Loading…"}
+          change={salesReport?.comparison?.aov_change_percent}
+        />
+        <MetricCard
+          title="Total units"
+          icon={PackageSearch}
+          value={salesReport ? formatNumber(getTotalUnits(salesReport)) : "—"}
+          description={salesReport ? `Across ${formatNumber(getUniqueSkus(salesReport))} SKUs` : salesReportError ?? "Loading…"}
+        />
       </section>
 
       <section className="space-y-4">
@@ -246,29 +208,12 @@ export default async function ManagerPage() {
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Sales performance</h2>
             <p className="text-sm text-slate-600">
-              Rolling 30-day window ending {formatDate(new Date())}
+              {salesReport
+                ? `${formatDate(new Date(salesReport.period.start_date))} → ${formatDate(new Date(salesReport.period.end_date))}`
+                : `Loading period`}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="outline" className="border-slate-300 text-slate-900">
-              <a
-                href={salesExportHref}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Export sales (CSV)
-              </a>
-            </Button>
-            <Button asChild size="sm" variant="outline" className="border-slate-300 text-slate-900">
-              <a
-                href={inventoryExportHref}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Export inventory (CSV)
-              </a>
-            </Button>
-          </div>
+          <ExportButtons startDate={period.startDate} endDate={period.endDate} />
         </div>
 
         {salesReportError ? (
@@ -276,198 +221,24 @@ export default async function ManagerPage() {
             <CardContent className="py-6 text-sm">{salesReportError}</CardContent>
           </Card>
         ) : salesReport ? (
-          <div className="grid gap-4 xl:grid-cols-5">
-            <Card className="border-slate-200 bg-white text-white xl:col-span-2">
-              <CardHeader className="space-y-1 pb-2">
-                <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
-                  Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6 text-sm text-slate-700">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
-                    Total sales
-                  </p>
-                  <p className="text-3xl font-semibold text-slate-900">
-                    {formatCurrency(salesReport.total_sales)}
-                  </p>
-                  <ChangeBadge value={salesReport.comparison?.sales_change_percent} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
-                      Orders
-                    </p>
-                    <p className="text-2xl font-semibold text-slate-900">
-                      {formatNumber(salesReport.total_orders)}
-                    </p>
-                    <ChangeBadge value={salesReport.comparison?.orders_change_percent} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
-                      Avg order value
-                    </p>
-                    <p className="text-2xl font-semibold text-slate-900">
-                      {formatCurrency(salesReport.average_order_value)}
-                    </p>
-                    <ChangeBadge value={salesReport.comparison?.aov_change_percent} />
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600">
-                  <p>
-                    Period: {formatDate(salesReport.period.start_date)} → {" "}
-                    {formatDate(salesReport.period.end_date)}
-                  </p>
-                  {salesReport.comparison ? (
-                    <p>
-                      Previous: {formatDate(salesReport.comparison.previous_period_start)} → {" "}
-                      {formatDate(salesReport.comparison.previous_period_end)}
-                    </p>
-                  ) : null}
-                </div>
+          <div className="space-y-4">
+            <Card className="border-slate-200 bg-white">
+              <CardContent className="pt-6">
+                <SalesTrendChart data={salesReport.daily_trend} />
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200 bg-white text-white xl:col-span-3">
+            <Card className="border-slate-200 bg-white">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
                   Top products
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="overflow-hidden rounded-xl border border-slate-200">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-slate-200">
-                        <TableHead>Product</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Units sold</TableHead>
-                        <TableHead>Revenue</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {salesReport.top_products.slice(0, 5).map((product) => (
-                        <TableRow key={product.product_id} className="border-slate-100 text-slate-700">
-                          <TableCell>
-                            <div className="space-y-0.5">
-                              <p className="font-semibold text-slate-900">{product.product_name}</p>
-                              <p className="text-xs text-slate-500">SKU #{product.product_id}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>{product.category}</TableCell>
-                          <TableCell>{formatNumber(product.quantity_sold)}</TableCell>
-                          <TableCell>{formatCurrency(product.total_revenue)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-slate-200">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-slate-200">
-                        <TableHead>Category</TableHead>
-                        <TableHead>Orders</TableHead>
-                        <TableHead>Units</TableHead>
-                        <TableHead>Revenue</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {salesReport.sales_by_category.map((category) => (
-                        <TableRow key={category.category} className="border-slate-100 text-slate-700">
-                          <TableCell className="font-semibold text-slate-900">
-                            {category.category}
-                          </TableCell>
-                          <TableCell>{formatNumber(category.order_count)}</TableCell>
-                          <TableCell>{formatNumber(category.quantity_sold)}</TableCell>
-                          <TableCell>{formatCurrency(category.total_revenue)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">Inventory posture</h2>
-            <p className="text-sm text-slate-600">
-              Track overall stock value and category coverage.
-            </p>
-          </div>
-        </div>
-
-        {inventoryReportError ? (
-          <Card className="border-destructive/50 bg-destructive/10 text-destructive">
-            <CardContent className="py-6 text-sm">{inventoryReportError}</CardContent>
-          </Card>
-        ) : inventoryReport ? (
-          <div className="grid gap-4 lg:grid-cols-5">
-            <Card className="border-slate-200 bg-white text-white lg:col-span-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
-                  Snapshot
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-slate-700">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Total products</p>
-                  <p className="text-2xl font-semibold text-slate-900">
-                    {formatNumber(inventoryReport.total_products)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Low stock</p>
-                  <p className="text-2xl font-semibold text-slate-900">
-                    {formatNumber(inventoryReport.low_stock_products)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Inventory value</p>
-                  <p className="text-2xl font-semibold text-slate-900">
-                    {formatCurrency(inventoryReport.total_inventory_value)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-white text-white lg:col-span-3">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
-                  Products by category
-                </CardTitle>
-              </CardHeader>
               <CardContent>
-                <div className="overflow-hidden rounded-xl border border-slate-200">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-slate-200">
-                        <TableHead>Category</TableHead>
-                        <TableHead>Products</TableHead>
-                        <TableHead>Units on hand</TableHead>
-                        <TableHead>Value</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {inventoryReport.products_by_category.map((category) => (
-                        <TableRow key={category.category} className="border-slate-100 text-slate-700">
-                          <TableCell className="font-semibold text-slate-900">
-                            {category.category}
-                          </TableCell>
-                          <TableCell>{formatNumber(category.product_count)}</TableCell>
-                          <TableCell>{formatNumber(category.total_stock)}</TableCell>
-                          <TableCell>{formatCurrency(category.total_value)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                <TopProductsVisualisation
+                  products={salesReport.top_products}
+                  categories={salesReport.sales_by_category}
+                />
               </CardContent>
             </Card>
           </div>
@@ -475,4 +246,53 @@ export default async function ManagerPage() {
       </section>
     </div>
   );
+}
+
+function MetricCard({
+  title,
+  icon: Icon,
+  value,
+  description,
+  change,
+}: {
+  title: string;
+  icon: LucideIcon;
+  value: string;
+  description?: string;
+  change?: number | null | undefined;
+}) {
+  return (
+    <Card className="border-slate-200 bg-white text-slate-900">
+      <CardHeader className="space-y-1 pb-2">
+        <CardTitle className="text-sm font-medium uppercase tracking-[0.18em] text-slate-700">
+          {title}
+        </CardTitle>
+        <Icon className="h-5 w-5 text-slate-600" aria-hidden />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-3xl font-semibold">{value}</p>
+        {description ? <p className="text-xs text-slate-600">{description}</p> : null}
+        {change !== undefined ? <ChangeBadge value={change} /> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function getTotalUnits(report: ApiSalesReport) {
+  const categoryUnits = report.sales_by_category.reduce(
+    (sum, category) => sum + category.quantity_sold,
+    0,
+  );
+  if (categoryUnits > 0) {
+    return categoryUnits;
+  }
+  return report.top_products.reduce((sum, product) => sum + product.quantity_sold, 0);
+}
+
+function getUniqueSkus(report: ApiSalesReport) {
+  const unique = new Set(report.top_products.map((product) => product.product_id));
+  if (unique.size > 0) {
+    return unique.size;
+  }
+  return report.sales_by_category.length;
 }
