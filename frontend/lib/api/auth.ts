@@ -1,6 +1,10 @@
 import { API_BASE_URL, DEFAULT_FETCH_OPTIONS } from "./config";
 import { ApiError } from "./client";
-import type { ApiCustomerResponse, ApiTokenResponse } from "../types/api";
+import type {
+  ApiAccountProfile,
+  ApiCustomerResponse,
+  ApiTokenResponse,
+} from "../types/api";
 import { getAuthToken } from "../auth-client";
 
 export interface RegisterCustomerPayload {
@@ -101,6 +105,6 @@ export async function getCurrentUser() {
     throw new ApiError(response.status, response.statusText, errorPayload);
   }
 
-  const data = (await response.json()) as ApiCustomerResponse;
+  const data = (await response.json()) as ApiAccountProfile;
   return data;
 }

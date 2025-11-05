@@ -9,7 +9,7 @@ class TestReports:
 
     def test_quick_stats(self, client, auth_headers_manager):
         """Test getting quick dashboard stats"""
-        response = client.get("/api/reports/quick-stats", headers=auth_headers_manager)
+        response = client.get("/api/admin/reports/quick-stats", headers=auth_headers_manager)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "today" in data
@@ -19,7 +19,7 @@ class TestReports:
 
     def test_quick_stats_unauthorized(self, client, auth_headers_customer):
         """Test quick stats with customer role (should fail)"""
-        response = client.get("/api/reports/quick-stats", headers=auth_headers_customer)
+        response = client.get("/api/admin/reports/quick-stats", headers=auth_headers_customer)
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_sales_report_default(self, client, auth_headers_manager):
@@ -27,7 +27,7 @@ class TestReports:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
         response = client.get(
-            f"/api/reports/sales?start_date={start_date.date()}&end_date={end_date.date()}",
+            f"/api/admin/reports/sales?start_date={start_date.date()}&end_date={end_date.date()}",
             headers=auth_headers_manager,
         )
         assert response.status_code == status.HTTP_200_OK
@@ -42,7 +42,7 @@ class TestReports:
         start_date = end_date - timedelta(days=30)
 
         response = client.get(
-            f"/api/reports/sales?start_date={start_date.date()}&end_date={end_date.date()}",
+            f"/api/admin/reports/sales?start_date={start_date.date()}&end_date={end_date.date()}",
             headers=auth_headers_manager,
         )
         assert response.status_code == status.HTTP_200_OK
@@ -55,7 +55,7 @@ class TestReports:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
         response = client.get(
-            f"/api/reports/sales?start_date={start_date.date()}&end_date={end_date.date()}&compare_previous=true",
+            f"/api/admin/reports/sales?start_date={start_date.date()}&end_date={end_date.date()}&compare_previous=true",
             headers=auth_headers_manager,
         )
         assert response.status_code == status.HTTP_200_OK
@@ -64,7 +64,7 @@ class TestReports:
 
     def test_inventory_report(self, client, auth_headers_manager):
         """Test inventory report"""
-        response = client.get("/api/reports/inventory", headers=auth_headers_manager)
+        response = client.get("/api/admin/reports/inventory", headers=auth_headers_manager)
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "total_products" in data
@@ -77,7 +77,7 @@ class TestReports:
     ):
         """Test inventory report filtered for low stock"""
         response = client.get(
-            "/api/reports/inventory?low_stock_only=true", headers=auth_headers_manager
+            "/api/admin/reports/inventory?low_stock_only=true", headers=auth_headers_manager
         )
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -87,7 +87,7 @@ class TestReports:
     def test_inventory_report_by_category(self, client, auth_headers_manager):
         """Test inventory report filtered by category"""
         response = client.get(
-            "/api/reports/inventory?category=Computing", headers=auth_headers_manager
+            "/api/admin/reports/inventory?category=Computing", headers=auth_headers_manager
         )
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -99,7 +99,7 @@ class TestReports:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
         response = client.get(
-            f"/api/reports/sales/export?format=csv&start_date={start_date.date()}&end_date={end_date.date()}",
+            f"/api/admin/reports/sales/export?format=csv&start_date={start_date.date()}&end_date={end_date.date()}",
             headers=auth_headers_manager,
         )
         assert response.status_code == status.HTTP_200_OK
@@ -109,17 +109,17 @@ class TestReports:
     def test_export_inventory_report_csv(self, client, auth_headers_manager):
         """Test exporting inventory report as CSV"""
         response = client.get(
-            "/api/reports/inventory/export?format=csv", headers=auth_headers_manager
+            "/api/admin/reports/inventory/export?format=csv", headers=auth_headers_manager
         )
         assert response.status_code == status.HTTP_200_OK
         assert response.headers["content-type"] == "text/csv; charset=utf-8"
 
     def test_reports_forbidden_for_staff(self, client, auth_headers_staff):
         """Test that staff cannot access reports"""
-        response = client.get("/api/reports/sales", headers=auth_headers_staff)
+        response = client.get("/api/admin/reports/sales", headers=auth_headers_staff)
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_reports_unauthorized(self, client):
         """Test reports without authentication"""
-        response = client.get("/api/reports/sales")
+        response = client.get("/api/admin/reports/sales")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED

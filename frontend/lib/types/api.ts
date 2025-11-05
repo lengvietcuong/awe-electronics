@@ -53,6 +53,17 @@ export interface ApiCustomerResponse {
   created_at: string;
 }
 
+export interface ApiAccountProfile {
+  id: number;
+  email: string;
+  role: "customer" | "staff" | "manager";
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  employee_number?: string | null;
+  created_at: string;
+}
+
 export interface ApiTokenResponse {
   access_token: string;
   token_type: string;
@@ -149,4 +160,90 @@ export interface ApiOrderListResponse {
   total: number;
   page: number;
   page_size: number;
+}
+
+export interface ApiSalesReportProduct {
+  product_id: number;
+  product_name: string;
+  category: string;
+  quantity_sold: number;
+  total_revenue: number;
+}
+
+export interface ApiSalesReportCategory {
+  category: string;
+  order_count: number;
+  quantity_sold: number;
+  total_revenue: number;
+}
+
+export interface ApiSalesReportDailyTrend {
+  date: string | null;
+  order_count: number;
+  total_sales: number;
+}
+
+export interface ApiSalesReport {
+  period_start: string;
+  period_end: string;
+  period: {
+    start_date: string;
+    end_date: string;
+  };
+  total_sales: number;
+  total_orders: number;
+  average_order_value: number;
+  top_products: ApiSalesReportProduct[];
+  sales_by_category: ApiSalesReportCategory[];
+  daily_trend: ApiSalesReportDailyTrend[];
+  comparison?: {
+    previous_period_start: string;
+    previous_period_end: string;
+    previous_total_sales: number;
+    previous_total_orders: number;
+    previous_average_order_value: number;
+    sales_change_percent: number;
+    orders_change_percent: number;
+    aov_change_percent: number;
+  };
+}
+
+export interface ApiInventoryReportCategory {
+  category: string;
+  product_count: number;
+  total_stock: number;
+  total_value: number;
+}
+
+export interface ApiInventoryReport {
+  total_products: number;
+  low_stock_products: number;
+  out_of_stock_products: number;
+  total_inventory_value: number;
+  products_by_category: ApiInventoryReportCategory[];
+}
+
+export interface ApiQuickStats {
+  today: {
+    total_sales: number;
+    total_orders: number;
+  };
+  this_week: {
+    total_sales: number;
+    total_orders: number;
+  };
+  this_month: {
+    total_sales: number;
+    total_orders: number;
+    average_order_value: number;
+  };
+  year_to_date: {
+    total_sales: number;
+    total_orders: number;
+  };
+  inventory: {
+    total_products: number;
+    low_stock_alerts: number;
+    out_of_stock: number;
+  };
 }

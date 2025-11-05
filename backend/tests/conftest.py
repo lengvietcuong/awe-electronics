@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
 from app.database.database import get_db
-from app.database.models import Account, Customer, Product, UserRole
+from app.database.models import Account, Customer, Employee, Product, UserRole
 from app.main import app
 from app.utils.security import get_password_hash
 from app.config import settings
@@ -60,9 +60,19 @@ def test_manager(db):
         is_verified=True,
     )
     db.add(account)
+    db.flush()
+
+    employee = Employee(
+        account_id=account.id,
+        first_name="Test",
+        last_name="Manager",
+        employee_number="MGR-001",
+    )
+    db.add(employee)
     db.commit()
     db.refresh(account)
-    return account
+    db.refresh(employee)
+    return account, employee
 
 
 @pytest.fixture
@@ -76,9 +86,19 @@ def test_staff(db):
         is_verified=True,
     )
     db.add(account)
+    db.flush()
+
+    employee = Employee(
+        account_id=account.id,
+        first_name="Test",
+        last_name="Staff",
+        employee_number="STF-001",
+    )
+    db.add(employee)
     db.commit()
     db.refresh(account)
-    return account
+    db.refresh(employee)
+    return account, employee
 
 
 @pytest.fixture

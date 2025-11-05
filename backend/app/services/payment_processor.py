@@ -94,7 +94,7 @@ class PaymentProcessor:
         """
         Mock payment processing strategy
         In real implementation, this would call appropriate payment gateway
-        For hackathon: 90% success rate
+        For hackathon: 99% success rate
         """
         # Simulate payment processing
-        return random.random() > 0.1  # 90% success rate
+        return random.random() > 0.01  # 99% success rate

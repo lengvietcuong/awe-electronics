@@ -140,3 +140,41 @@ class TestProductManagement:
             f"/api/admin/products/{product_id}", headers=auth_headers_manager
         )
         assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_get_low_stock_products(self, client, auth_headers_staff, test_products):
+        """Test listing low stock products"""
+        response = client.get(
+            "/api/admin/products/low-stock", headers=auth_headers_staff
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert isinstance(data, list)
+        assert any(item["id"] == test_products[0].id for item in data)
+
+    def test_adjust_product_stock(self, client, auth_headers_staff, test_products):
+        """Test adjusting stock levels for a product"""
+        product_id = test_products[0].id
+        initial_stock = test_products[0].stock_quantity
+        response = client.patch(
+            f"/api/admin/products/{product_id}/stock",
+            headers=auth_headers_staff,
+            json={"delta": 5, "reason": "Restock"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["id"] == product_id
+        assert data["stock_quantity"] == initial_stock + 5
+
+    def test_adjust_product_stock_invalid(
+        self, client, auth_headers_staff, test_products
+    ):
+        """Test invalid stock adjustment that drops below zero"""
+        product_id = test_products[0].id
+        response = client.patch(
+            f"/api/admin/products/{product_id}/stock",
+            headers=auth_headers_staff,
+            json={"delta": -999},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert "stock" in data["detail"].lower()

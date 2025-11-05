@@ -53,7 +53,7 @@ app.include_router(
 app.include_router(
     admin_orders.router, prefix="/api/admin/orders", tags=["Admin - Orders"]
 )
-app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+app.include_router(reports.router, prefix="/api/admin/reports", tags=["Reports"])
 
 
 @app.get("/")

@@ -131,10 +131,10 @@ class OrderProcessor:
 
     @staticmethod
     def get_pending_orders(db: Session) -> List[Order]:
-        """Get orders pending fulfillment"""
+        """Get orders pending fulfillment (only paid orders)"""
         return (
             db.query(Order)
-            .filter(Order.status.in_([OrderStatus.PAID, OrderStatus.PROCESSING]))
+            .filter(Order.status == OrderStatus.PAID)
             .order_by(Order.paid_at)
             .all()
         )

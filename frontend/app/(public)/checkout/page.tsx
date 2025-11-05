@@ -36,15 +36,15 @@ export default async function CheckoutPage() {
   let currentUser = null;
   try {
     currentUser = await getCurrentUserServer();
-    console.log("[Checkout] Current user loaded:", currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : "null");
   } catch (error) {
-    // User is not logged in or session expired
-    console.log("[Checkout] Failed to load user:", error instanceof ApiError ? `${error.status} ${error.statusText}` : error);
-    if (!(error instanceof ApiError && error.status === 401)) {
-      console.error("Error fetching current user:", error);
+    // User is not logged in (guest checkout)
+    if (error instanceof ApiError && error.status === 401) {
+      currentUser = null;
+    } else {
+      throw error;
     }
   }
-
+  
   const [productResults] = await Promise.all([
     fetchProducts({ pageSize: 3 }).catch(() => ({ products: [] })),
   ]);
@@ -166,9 +166,9 @@ export default async function CheckoutPage() {
 
       try {
         await clearCart();
-        // Revalidate the cart page and layout to update the cart count in the header
-        revalidatePath("/cart");
-        revalidatePath("/", "layout");
+        // Note: We don't revalidate the cart page here because it would cause
+        // the checkout page to redirect to /cart before the success modal is shown.
+        // The cart will be revalidated when the user navigates away via the modal.
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 404)) {
           console.error("Failed to clear cart after checkout:", error);

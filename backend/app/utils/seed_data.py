@@ -52,8 +52,8 @@ def seed_database():
 
         # Manager account
         manager_account = Account(
-            email="manager@aweelectronics.com",
-            hashed_password=get_password_hash("manager123"),
+            email="manager@gmail.com",
+            hashed_password=get_password_hash("vietcuong"),
             role=UserRole.MANAGER,
             is_active=True,
             is_verified=True,
@@ -71,8 +71,8 @@ def seed_database():
 
         # Staff accounts
         staff_account = Account(
-            email="staff@aweelectronics.com",
-            hashed_password=get_password_hash("staff123"),
+            email="staff@gmail.com",
+            hashed_password=get_password_hash("vietcuong"),
             role=UserRole.STAFF,
             is_active=True,
             is_verified=True,
@@ -619,8 +619,8 @@ def seed_database():
 
         print("\n Database seeding completed successfully!")
         print("\n Summary:")
-        print(f"   - Manager: manager@aweelectronics.com (password: manager123)")
-        print(f"   - Staff: staff@aweelectronics.com (password: staff123)")
+        print(f"   - Manager: manager@gmail.com (password: vietcuong)")
+        print(f"   - Staff: staff@gmail.com (password: vietcuong)")
         print(f"   - Customers: {len(customers)} accounts (password: password123)")
         print(f"   - Products: {len(products)} across multiple categories")
         print(

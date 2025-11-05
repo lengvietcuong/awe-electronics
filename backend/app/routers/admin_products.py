@@ -6,9 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.api_schemas import ProductCreate, ProductUpdate, ProductResponse
-from app.services import ProductManager
-from app.utils.security import get_current_staff
+from app.api_schemas import (
+    ProductCreate,
+    ProductUpdate,
+    ProductResponse,
+    ProductStockAdjustment,
+)
+from app.services import ProductManager, InventoryManager
+from app.utils.security import get_current_staff, get_current_manager
 from app.database.models import Account, Product
 
 router = APIRouter()
@@ -73,11 +78,46 @@ def discontinue_product(
     return product
 
 
+@router.patch(
+    "/{product_id}/stock",
+    response_model=ProductResponse,
+    status_code=status.HTTP_200_OK,
+)
+def adjust_stock_levels(
+    product_id: int,
+    adjustments: ProductStockAdjustment,
+    db: Session = Depends(get_db),
+    current_account: Account = Depends(get_current_staff),
+):
+    """
+    Adjust stock levels for a product (staff/manager only)
+
+    Positive adjustments increase available stock. Negative adjustments reduce stock but
+    cannot drop below zero or below reserved quantity for open orders.
+    """
+    try:
+        product = ProductManager.adjust_stock(db, product_id, adjustments.delta)
+        return product
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/low-stock", response_model=list[ProductResponse])
+def list_low_stock_products(
+    threshold: int | None = None,
+    db: Session = Depends(get_db),
+    current_account: Account = Depends(get_current_staff),
+):
+    """List products at or below the low stock threshold (staff/manager only)."""
+    products = InventoryManager.get_low_stock_products(db, custom_threshold=threshold)
+    return products
+
+
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
-    current_account: Account = Depends(get_current_staff),
+    current_account: Account = Depends(get_current_manager),
 ):
     """
     Delete product permanently (manager only - use with caution)

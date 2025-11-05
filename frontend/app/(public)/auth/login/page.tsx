@@ -8,9 +8,10 @@ import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/client";
-import { loginCustomer } from "@/lib/api/auth";
+import { getCurrentUser, loginCustomer } from "@/lib/api/auth";
 import { setAuthToken } from "@/lib/auth-client";
 import { useAuth } from "@/lib/auth-context";
 import { setAuthTokenCookie } from "@/lib/actions/auth";
@@ -33,7 +34,7 @@ function extractErrorMessage(error: unknown) {
 
 export default function LoginPage() {
 	const router = useRouter();
-	const { updateAuthState } = useAuth();
+	const { updateAuthState, setProfile } = useAuth();
 	const [email, setEmail] = React.useState("");
 	const [password, setPassword] = React.useState("");
 	const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
@@ -53,7 +54,10 @@ export default function LoginPage() {
 				setAuthToken(token.access_token);
 				// Store in cookie for server-side access
 				await setAuthTokenCookie(token.access_token);
-				// Update auth state immediately to trigger header update
+				// Fetch profile and store locally for role-aware UI
+				const profile = await getCurrentUser();
+				setProfile(profile);
+				// Update auth state immediately to trigger header refresh
 				updateAuthState();
 				setStatusMessage("Signed in successfully. Redirecting...");
 				setPassword("");
@@ -100,13 +104,12 @@ export default function LoginPage() {
 						<div className="space-y-2">
 							<div className="flex items-center justify-between">
 								<Label htmlFor="password">Password</Label>
-								<Link href="/auth/register" className="text-xs font-medium text-primary hover:underline">
-									Need an account?
+								<Link href="/auth/forgot-password" className="text-xs font-medium text-primary hover:underline">
+									Forgot password?
 								</Link>
 							</div>
-							<Input
+							<PasswordInput
 								id="password"
-								type="password"
 								autoComplete="current-password"
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
@@ -131,7 +134,6 @@ export default function LoginPage() {
 					) : null}
 				</CardContent>
 				<CardFooter className="flex-col gap-3 text-sm text-muted-foreground">
-					<p>Forgot your password? Reach out to our support team and we’ll help you get back in.</p>
 					<p>
 						New to AWE? <Link href="/auth/register" className="font-medium text-primary hover:underline">Create an account</Link> to unlock faster checkout and warranty tracking.
 					</p>

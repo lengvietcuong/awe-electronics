@@ -293,6 +293,51 @@ class TestOrderFulfillment:
         data = response.json()
         assert data["tracking_number"] == "AU123456789012"
 
+    def test_ship_order_twice_fails(
+        self, client, auth_headers_staff, auth_headers_customer, test_products
+    ):
+        """Shipping an order twice should return an error"""
+        product_id = test_products[0].id
+        client.post(
+            "/api/cart/items",
+            headers=auth_headers_customer,
+            json={"product_id": product_id, "quantity": 1},
+        )
+
+        checkout_response = client.post(
+            "/api/checkout",
+            headers=auth_headers_customer,
+            json={
+                "payment_method": "CREDIT_CARD",
+                "shipping_method": "STANDARD",
+                "delivery_address": {
+                    "street_address": "123 Test St",
+                    "suburb": "Testville",
+                    "state": "VIC",
+                    "postcode": "3000",
+                    "country": "Australia",
+                },
+            },
+        )
+        order_id = checkout_response.json()["order_id"]
+
+        # First ship should succeed
+        first_response = client.post(
+            f"/api/admin/orders/{order_id}/ship",
+            headers=auth_headers_staff,
+            json={"tracking_number": "AU111", "courier_name": "TestCourier"},
+        )
+        assert first_response.status_code == status.HTTP_200_OK
+
+        # Second ship should fail with 400
+        second_response = client.post(
+            f"/api/admin/orders/{order_id}/ship",
+            headers=auth_headers_staff,
+            json={"tracking_number": "AU222"},
+        )
+        assert second_response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "shipment" in second_response.json()["detail"].lower()
+
     def test_mark_order_delivered(
         self, client, auth_headers_staff, auth_headers_customer, test_products
     ):

@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, ShoppingCart, X, Zap, User, LogOut } from "lucide-react";
+import { Menu, ShoppingCart, X, Zap, User, LogOut, LayoutDashboard } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { clearAuthToken } from "@/lib/auth-client";
@@ -12,10 +12,13 @@ import { useAuth } from "@/lib/auth-context";
 
 const primaryNav = [
   { href: "/products", label: "Shop" },
-  { href: "/products?category=computing", label: "Computing" },
-  { href: "/products?category=audio", label: "Audio" },
-  { href: "/products?category=gaming", label: "Gaming" },
   { href: "/order-tracking", label: "Track Order" },
+];
+
+const authenticatedNav = [
+  { href: "/products", label: "Shop" },
+  { href: "/order-tracking", label: "Track Order" },
+  { href: "/orders", label: "My Orders" },
 ];
 
 interface SiteHeaderProps {
@@ -25,7 +28,20 @@ interface SiteHeaderProps {
 export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const { isLoggedIn, updateAuthState } = useAuth();
+  const { isLoggedIn, updateAuthState, profile } = useAuth();
+  const dashboardLinks = React.useMemo(() => {
+    if (!profile) return [] as Array<{ href: string; label: string }>;
+
+    if (profile.role === "staff") {
+      return [{ href: "/staff", label: "Dashboard" }];
+    }
+
+    if (profile.role === "manager") {
+      return [{ href: "/manager", label: "Dashboard" }];
+    }
+
+    return [];
+  }, [profile]);
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -57,7 +73,7 @@ export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
             <span className="hidden sm:inline">AWE Electronics</span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-            {primaryNav.map((item) => (
+            {(isLoggedIn ? authenticatedNav : primaryNav).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -82,6 +98,22 @@ export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
           <div className="hidden items-center gap-2 sm:flex">
             {isLoggedIn ? (
               <>
+                {dashboardLinks.length > 0
+                  ? dashboardLinks.map((link) => (
+                      <Button
+                        key={link.href}
+                        variant="secondary"
+                        size="sm"
+                        asChild
+                        className="gap-2"
+                      >
+                        <Link href={link.href}>
+                          <LayoutDashboard className="h-4 w-4" />
+                          {link.label}
+                        </Link>
+                      </Button>
+                    ))
+                  : null}
                 <Button variant="ghost" size="icon" asChild>
                   <Link href="/orders" aria-label="My orders">
                     <User className="h-4 w-4" />
@@ -114,19 +146,37 @@ export function SiteHeader({ cartItemCount = 0 }: SiteHeaderProps) {
           </Button>
         </div>
       </div>
-      <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} isLoggedIn={isLoggedIn} onLogout={handleLogout} />
+      <MobileMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        isLoggedIn={isLoggedIn}
+        onLogout={handleLogout}
+        dashboardLinks={dashboardLinks}
+      />
     </header>
   );
 }
 
-function MobileMenu({ open, onClose, isLoggedIn, onLogout }: { open: boolean; onClose: () => void; isLoggedIn: boolean; onLogout: () => void }) {
+function MobileMenu({
+  open,
+  onClose,
+  isLoggedIn,
+  onLogout,
+  dashboardLinks,
+}: {
+  open: boolean;
+  onClose: () => void;
+  isLoggedIn: boolean;
+  onLogout: () => void;
+  dashboardLinks: Array<{ href: string; label: string }>;
+}) {
   if (!open) return null;
 
   return (
     <div className="md:hidden">
       <div className="border-t border-border/80 bg-background">
         <nav className="flex flex-col gap-4 px-4 py-4">
-          {primaryNav.map((item) => (
+          {(isLoggedIn ? authenticatedNav : primaryNav).map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -146,6 +196,21 @@ function MobileMenu({ open, onClose, isLoggedIn, onLogout }: { open: boolean; on
             </Button>
             {isLoggedIn ? (
               <>
+                {dashboardLinks.length > 0
+                  ? dashboardLinks.map((link) => (
+                      <Button
+                        key={link.href}
+                        variant="secondary"
+                        asChild
+                      >
+                        <Link href={link.href} onClick={onClose}>
+                          <div className="flex items-center gap-2">
+                            <LayoutDashboard className="h-4 w-4" /> {link.label}
+                          </div>
+                        </Link>
+                      </Button>
+                    ))
+                  : null}
                 <Button variant="ghost" asChild>
                   <Link href="/orders" onClick={onClose}>
                     <div className="flex items-center gap-2">

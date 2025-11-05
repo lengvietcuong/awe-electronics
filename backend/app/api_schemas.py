@@ -85,6 +85,22 @@ class CustomerResponse(BaseModel):
         from_attributes = True
 
 
+class AccountProfileResponse(BaseModel):
+    """Generic account profile for any role"""
+
+    id: int
+    email: EmailStr
+    role: UserRole
+    first_name: Optional[str]
+    last_name: Optional[str]
+    phone: Optional[str] = None
+    employee_number: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class Token(BaseModel):
     """JWT token response"""
 
@@ -188,6 +204,16 @@ class ProductResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ProductStockAdjustment(BaseModel):
+    """Adjust stock quantity by delta"""
+
+    delta: int = Field(..., description="Positive to add stock, negative to remove")
+    reason: Optional[str] = Field(
+        default=None,
+        description="Optional note explaining the adjustment",
+    )
 
 
 class ProductListResponse(BaseModel):
@@ -350,6 +376,16 @@ class ShipmentCreate(BaseModel):
     """Create shipment (staff only)"""
 
     order_id: int
+    packing_notes: Optional[str] = None
+
+
+class ShipmentDispatchRequest(BaseModel):
+    """Ship order with optional tracking details"""
+
+    tracking_number: Optional[str] = None
+    courier_name: Optional[str] = Field(
+        default=None, description="Defaults to Australia Post if omitted"
+    )
     packing_notes: Optional[str] = None
 
 

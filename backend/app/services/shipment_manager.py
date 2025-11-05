@@ -23,7 +23,12 @@ class ShipmentManager:
 
     @staticmethod
     def create_shipment(
-        db: Session, order_id: int, packing_notes: Optional[str] = None
+        db: Session,
+        order_id: int,
+        packing_notes: Optional[str] = None,
+        *,
+        tracking_number: Optional[str] = None,
+        courier_name: Optional[str] = None,
     ) -> Shipment:
         """Create shipment for order"""
         order = db.query(Order).filter(Order.id == order_id).first()
@@ -33,14 +38,18 @@ class ShipmentManager:
         if order.status not in [OrderStatus.PAID, OrderStatus.PROCESSING]:
             raise ValueError("Order not ready for shipment")
 
+        if order.shipment:
+            raise ValueError("Shipment already exists for this order")
+
         # Generate tracking number
-        tracking_number = ShipmentManager.generate_tracking_number()
+        tracking_number = tracking_number or ShipmentManager.generate_tracking_number()
+        courier_name = courier_name or "Australia Post"
 
         # Create shipment
         shipment = Shipment(
             order_id=order_id,
             tracking_number=tracking_number,
-            courier_name="Australia Post",  # Mock courier
+            courier_name=courier_name,
             packed_at=datetime.now(),
             packing_notes=packing_notes,
         )
@@ -60,6 +69,9 @@ class ShipmentManager:
         shipment = db.query(Shipment).filter(Shipment.id == shipment_id).first()
         if not shipment:
             raise ValueError("Shipment not found")
+
+        if shipment.shipped_at is not None:
+            raise ValueError("Shipment already marked as shipped")
 
         shipment.shipped_at = datetime.now()
 
@@ -86,6 +98,9 @@ class ShipmentManager:
         shipment = db.query(Shipment).filter(Shipment.id == shipment_id).first()
         if not shipment:
             raise ValueError("Shipment not found")
+
+        if shipment.delivered_at is not None:
+            raise ValueError("Shipment already marked as delivered")
 
         shipment.delivered_at = datetime.now()
         shipment.delivery_notes = delivery_notes

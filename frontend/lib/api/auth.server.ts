@@ -2,7 +2,7 @@ import "server-only";
 
 import { API_BASE_URL, DEFAULT_FETCH_OPTIONS } from "./config";
 import { ApiError } from "./client";
-import type { ApiCustomerResponse } from "../types/api";
+import type { ApiAccountProfile } from "../types/api";
 import { getAuthTokenServer } from "../auth";
 
 async function parseErrorPayload(response: Response) {
@@ -43,6 +43,6 @@ export async function getCurrentUserServer() {
     throw new ApiError(response.status, response.statusText, errorPayload);
   }
 
-  const data = (await response.json()) as ApiCustomerResponse;
+  const data = (await response.json()) as ApiAccountProfile;
   return data;
 }

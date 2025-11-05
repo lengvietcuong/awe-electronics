@@ -8,6 +8,7 @@ import { UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/client";
 import { registerCustomer } from "@/lib/api/auth";
@@ -142,9 +143,8 @@ export default function RegisterPage() {
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="password">Password</Label>
-							<Input
+							<PasswordInput
 								id="password"
-								type="password"
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
 								required
@@ -155,9 +155,8 @@ export default function RegisterPage() {
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="confirm-password">Confirm password</Label>
-							<Input
+							<PasswordInput
 								id="confirm-password"
-								type="password"
 								value={confirmPassword}
 								onChange={(event) => setConfirmPassword(event.target.value)}
 								required

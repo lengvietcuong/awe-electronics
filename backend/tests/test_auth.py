@@ -74,6 +74,24 @@ class TestAuth:
         assert data["email"] == "test.customer@test.com"
         assert data["role"] == "customer"
 
+    def test_get_current_staff_profile(self, client, auth_headers_staff):
+        """Test getting staff profile returns employee metadata"""
+        response = client.get("/api/auth/me", headers=auth_headers_staff)
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["email"] == "test.staff@test.com"
+        assert data["role"] == "staff"
+        assert data["employee_number"] == "STF-001"
+
+    def test_get_current_manager_profile(self, client, auth_headers_manager):
+        """Test getting manager profile returns employee metadata"""
+        response = client.get("/api/auth/me", headers=auth_headers_manager)
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["email"] == "test.manager@test.com"
+        assert data["role"] == "manager"
+        assert data["employee_number"] == "MGR-001"
+
     def test_get_current_user_unauthorized(self, client):
         """Test getting current user without authentication"""
         response = client.get("/api/auth/me")
