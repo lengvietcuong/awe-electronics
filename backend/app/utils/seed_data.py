@@ -53,7 +53,7 @@ def seed_database():
         # Manager account
         manager_account = Account(
             email="manager@gmail.com",
-            hashed_password=get_password_hash("vietcuong"),
+            hashed_password=get_password_hash("luongtam"),
             role=UserRole.MANAGER,
             is_active=True,
             is_verified=True,
@@ -72,7 +72,7 @@ def seed_database():
         # Staff accounts
         staff_account = Account(
             email="staff@gmail.com",
-            hashed_password=get_password_hash("vietcuong"),
+            hashed_password=get_password_hash("luongtam"),
             role=UserRole.STAFF,
             is_active=True,
             is_verified=True,
@@ -93,6 +93,7 @@ def seed_database():
         customers = []
 
         customer_data = [
+            ("customer@gmail.com", "Default", "Customer", "0400000000"),
             ("john.doe@email.com", "John", "Doe", "0412345678"),
             ("jane.smith@email.com", "Jane", "Smith", "0423456789"),
             ("bob.wilson@email.com", "Bob", "Wilson", "0434567890"),
@@ -101,9 +102,11 @@ def seed_database():
         ]
 
         for email, first_name, last_name, phone in customer_data:
+            # Use 'luongtam' for customer@gmail.com, 'password123' for others
+            password = "luongtam" if email == "customer@gmail.com" else "password123"
             account = Account(
                 email=email,
-                hashed_password=get_password_hash("password123"),
+                hashed_password=get_password_hash(password),
                 role=UserRole.CUSTOMER,
                 is_active=True,
                 is_verified=True,
@@ -619,9 +622,12 @@ def seed_database():
 
         print("\n Database seeding completed successfully!")
         print("\n Summary:")
-        print(f"   - Manager: manager@gmail.com (password: vietcuong)")
-        print(f"   - Staff: staff@gmail.com (password: vietcuong)")
-        print(f"   - Customers: {len(customers)} accounts (password: password123)")
+        print(f"   - Manager: manager@gmail.com (password: luongtam)")
+        print(f"   - Staff: staff@gmail.com (password: luongtam)")
+        print(f"   - Customer: customer@gmail.com (password: luongtam)")
+        print(
+            f"   - Other customers: {len(customers) - 1} accounts (password: password123)"
+        )
         print(f"   - Products: {len(products)} across multiple categories")
         print(
             f"   - Orders: {order_count + 3} total ({order_count} historical, 3 pending)"
