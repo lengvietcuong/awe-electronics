@@ -211,7 +211,17 @@ export default async function CheckoutPage() {
       shippingOptions={shippingOptions.map((option) => ({ ...option }))}
       paymentMethods={paymentMethods}
       onSubmit={placeOrder}
-      currentUser={currentUser}
+      currentUser={
+        currentUser
+          ? {
+              id: currentUser.id,
+              email: currentUser.email,
+              first_name: currentUser.first_name ?? "",
+              last_name: currentUser.last_name ?? "",
+              phone: currentUser.phone ?? null,
+            }
+          : undefined
+      }
     />
   );
 }
