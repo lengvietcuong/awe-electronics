@@ -1,22 +1,76 @@
-"""
-Admin Products router - Product management (staff/manager only)
-"""
+"""Admin Products router - Product management (staff/manager only)"""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import math
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.database.database import get_db
 from app.api_schemas import (
     ProductCreate,
-    ProductUpdate,
+    ProductListResponse,
     ProductResponse,
     ProductStockAdjustment,
+    ProductUpdate,
 )
-from app.services import ProductManager, InventoryManager
-from app.utils.security import get_current_staff, get_current_manager
-from app.database.models import Account, Product
+from app.database.database import get_db
+from app.database.models import Account
+from app.services import InventoryManager, ProductManager
+from app.utils.security import get_current_manager, get_current_staff
 
 router = APIRouter()
+
+
+@router.get("", response_model=ProductListResponse)
+def list_products(
+    search: Optional[str] = Query(
+        None, description="Search by name, description, brand, or model number"
+    ),
+    category: Optional[str] = Query(None, min_length=1, max_length=100),
+    status: Optional[Literal["active", "inactive"]] = Query(
+        None, description="Filter by lifecycle status"
+    ),
+    availability: Optional[Literal["in_stock", "out_of_stock", "low_stock"]] = Query(
+        None, description="Filter by stock availability"
+    ),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    sort_by: Literal[
+        "created_at",
+        "updated_at",
+        "name",
+        "price",
+        "stock",
+        "stock_quantity",
+        "availability",
+    ] = Query("created_at"),
+    sort_direction: Literal["asc", "desc"] = Query("desc"),
+    db: Session = Depends(get_db),
+    current_account: Account = Depends(get_current_staff),
+):
+    """List products for management with rich filtering and sorting."""
+
+    products, total = ProductManager.list_products(
+        db,
+        search=search,
+        category=category,
+        status=status,
+        availability=availability,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+    )
+
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+
+    return ProductListResponse(
+        products=products,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
@@ -46,34 +100,13 @@ def update_product(
 
     Updates product information including price, stock, and attributes.
     """
-    product = ProductManager.update_product(db, product_id, product_data)
+    try:
+        product = ProductManager.update_product(db, product_id, product_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-
-    return product
-
-
-@router.post(
-    "/{product_id}/discontinue",
-    response_model=ProductResponse,
-    status_code=status.HTTP_200_OK,
-)
-def discontinue_product(
-    product_id: int,
-    db: Session = Depends(get_db),
-    current_account: Account = Depends(get_current_staff),
-):
-    """
-    Mark product as discontinued (staff/manager only)
-
-    Product will no longer be available for purchase but remains in system for order history.
-    """
-    product = db.query(Product).filter(Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-
-    ProductManager.discontinue_product(db, product_id)
-    db.refresh(product)
 
     return product
 
@@ -111,6 +144,21 @@ def list_low_stock_products(
     """List products at or below the low stock threshold (staff/manager only)."""
     products = InventoryManager.get_low_stock_products(db, custom_threshold=threshold)
     return products
+
+
+@router.get("/{product_id}", response_model=ProductResponse)
+def get_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_account: Account = Depends(get_current_staff),
+):
+    """Retrieve a single product, including inactive or discontinued items."""
+
+    product = ProductManager.get_product(db, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    return product
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

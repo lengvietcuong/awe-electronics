@@ -11,6 +11,7 @@ export interface ApiProduct {
   available_quantity: number;
   is_available: boolean;
   is_low_stock: boolean;
+  low_stock_threshold: number;
   image_url: string | null;
   is_active: boolean;
   is_discontinued: boolean;

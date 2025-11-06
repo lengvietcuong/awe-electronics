@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Metadata } from "next";
-import { revalidatePath } from "next/cache";
 
 import { CheckoutFlow, type CheckoutSubmissionPayload } from "@/components/checkout/checkout-flow";
 import { clearCart, fetchCart } from "@/lib/api/cart";

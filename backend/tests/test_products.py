@@ -2,6 +2,8 @@
 
 from fastapi import status
 
+from app.database.models import Product
+
 
 class TestProducts:
     """Test product browsing and management endpoints"""
@@ -69,6 +71,58 @@ class TestProducts:
 class TestProductManagement:
     """Test product management endpoints (admin only)"""
 
+    def test_list_products_admin(self, client, auth_headers_staff, test_products):
+        """Staff can list products with pagination metadata."""
+        response = client.get("/api/admin/products", headers=auth_headers_staff)
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["total"] >= len(test_products)
+        assert data["page"] == 1
+        assert data["page_size"] >= len(data["products"])
+
+    def test_list_products_with_filters(
+        self, client, auth_headers_staff, test_products, db
+    ):
+        """Staff can filter by status and availability."""
+        product_id = test_products[0].id
+
+        # Mark one product inactive
+        response = client.put(
+            f"/api/admin/products/{product_id}",
+            headers=auth_headers_staff,
+            json={"is_active": False},
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        # Another product out of stock
+        out_of_stock_id = test_products[1].id
+        response = client.put(
+            f"/api/admin/products/{out_of_stock_id}",
+            headers=auth_headers_staff,
+            json={"stock_quantity": 0},
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        inactive_response = client.get(
+            "/api/admin/products",
+            headers=auth_headers_staff,
+            params={"status": "inactive"},
+        )
+        assert inactive_response.status_code == status.HTTP_200_OK
+        inactive_data = inactive_response.json()
+        assert any(prod["id"] == product_id for prod in inactive_data["products"])
+
+        out_of_stock_response = client.get(
+            "/api/admin/products",
+            headers=auth_headers_staff,
+            params={"availability": "out_of_stock"},
+        )
+        assert out_of_stock_response.status_code == status.HTTP_200_OK
+        out_of_stock_data = out_of_stock_response.json()
+        assert any(
+            prod["id"] == out_of_stock_id for prod in out_of_stock_data["products"]
+        )
+
     def test_create_product_as_staff(self, client, auth_headers_staff):
         """Test creating a product as staff"""
         response = client.post(
@@ -123,15 +177,25 @@ class TestProductManagement:
         assert data["name"] == "Updated Test Laptop"
         assert data["price"] == 1399.99
 
-    def test_discontinue_product(self, client, auth_headers_staff, test_products):
-        """Test discontinuing a product"""
-        product_id = test_products[2].id
-        response = client.post(
-            f"/api/admin/products/{product_id}/discontinue", headers=auth_headers_staff
+    def test_get_product_includes_inactive(
+        self, client, auth_headers_staff, test_products
+    ):
+        """Ensure admin can retrieve inactive product details."""
+        product_id = test_products[0].id
+        response = client.put(
+            f"/api/admin/products/{product_id}",
+            headers=auth_headers_staff,
+            json={"is_active": False},
         )
         assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["is_discontinued"] is True
+
+        detail_response = client.get(
+            f"/api/admin/products/{product_id}", headers=auth_headers_staff
+        )
+        assert detail_response.status_code == status.HTTP_200_OK
+        detail_data = detail_response.json()
+        assert detail_data["id"] == product_id
+        assert detail_data["is_active"] is False
 
     def test_delete_product(self, client, auth_headers_manager, test_products):
         """Test deleting a product (manager only)"""
@@ -140,6 +204,63 @@ class TestProductManagement:
             f"/api/admin/products/{product_id}", headers=auth_headers_manager
         )
         assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_delete_product_with_cart_items(
+        self, client, auth_headers_manager, test_products, db
+    ):
+        """Test deleting a product that has items in shopping carts"""
+        from app.database.models import ShoppingCart, CartItem
+
+        # Create a cart with items
+        cart = ShoppingCart(customer_id=None, session_id="test_session")
+        db.add(cart)
+        db.commit()
+        db.refresh(cart)
+
+        product_id = test_products[0].id
+        cart_item = CartItem(cart_id=cart.id, product_id=product_id, quantity=2)
+        db.add(cart_item)
+        db.commit()
+
+        # Verify cart item exists
+        cart_item_count = (
+            db.query(CartItem).filter(CartItem.product_id == product_id).count()
+        )
+        assert cart_item_count == 1
+
+        # Delete the product - this should also delete the cart items
+        response = client.delete(
+            f"/api/admin/products/{product_id}", headers=auth_headers_manager
+        )
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+        # Verify product was deleted
+        product = db.query(Product).filter(Product.id == product_id).first()
+        assert product is None
+
+        # Verify cart items were also deleted
+        cart_item_count = (
+            db.query(CartItem).filter(CartItem.product_id == product_id).count()
+        )
+        assert cart_item_count == 0
+
+    def test_update_product_rejects_reserved_mismatch(
+        self, client, auth_headers_staff, test_products, db
+    ):
+        """Updating stock below reserved quantity should fail."""
+        product_id = test_products[0].id
+        product = db.query(Product).filter(Product.id == product_id).first()
+        product.reserved_quantity = 5
+        db.commit()
+
+        response = client.put(
+            f"/api/admin/products/{product_id}",
+            headers=auth_headers_staff,
+            json={"stock_quantity": 3},
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        body = response.json()
+        assert "reserved" in body["detail"].lower()
 
     def test_get_low_stock_products(self, client, auth_headers_staff, test_products):
         """Test listing low stock products"""
@@ -178,3 +299,97 @@ class TestProductManagement:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         data = response.json()
         assert "stock" in data["detail"].lower()
+
+
+class TestManagerPermissions:
+    """Test that managers can do everything staff can, plus more"""
+
+    def test_manager_can_list_products(
+        self, client, auth_headers_manager, test_products
+    ):
+        """Managers should be able to list products (staff permission)"""
+        response = client.get("/api/admin/products", headers=auth_headers_manager)
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["total"] >= len(test_products)
+
+    def test_manager_can_create_product(self, client, auth_headers_manager):
+        """Managers should be able to create products (staff permission)"""
+        response = client.post(
+            "/api/admin/products",
+            headers=auth_headers_manager,
+            json={
+                "name": "Manager Created Product",
+                "description": "Created by a manager",
+                "price": 799.99,
+                "category": "Computing",
+                "brand": "TestBrand",
+                "model_number": "MCP-3000",
+                "stock_quantity": 20,
+            },
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        data = response.json()
+        assert data["name"] == "Manager Created Product"
+
+    def test_manager_can_update_product(
+        self, client, auth_headers_manager, test_products
+    ):
+        """Managers should be able to update products (staff permission)"""
+        product_id = test_products[0].id
+        response = client.put(
+            f"/api/admin/products/{product_id}",
+            headers=auth_headers_manager,
+            json={
+                "name": "Manager Updated Product",
+                "price": 1599.99,
+            },
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["name"] == "Manager Updated Product"
+
+    def test_manager_can_adjust_stock(
+        self, client, auth_headers_manager, test_products
+    ):
+        """Managers should be able to adjust stock (staff permission)"""
+        product_id = test_products[0].id
+        initial_stock = test_products[0].stock_quantity
+        response = client.patch(
+            f"/api/admin/products/{product_id}/stock",
+            headers=auth_headers_manager,
+            json={"delta": 10, "reason": "Manager restocking"},
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["stock_quantity"] == initial_stock + 10
+
+    def test_manager_can_get_low_stock(
+        self, client, auth_headers_manager, test_products
+    ):
+        """Managers should be able to view low stock products (staff permission)"""
+        response = client.get(
+            "/api/admin/products/low-stock", headers=auth_headers_manager
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert isinstance(response.json(), list)
+
+    def test_manager_can_delete_product(
+        self, client, auth_headers_manager, test_products
+    ):
+        """Managers should be able to delete products (manager-only permission)"""
+        product_id = test_products[1].id
+        response = client.delete(
+            f"/api/admin/products/{product_id}", headers=auth_headers_manager
+        )
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
+    def test_staff_cannot_delete_product(
+        self, client, auth_headers_staff, test_products
+    ):
+        """Staff should NOT be able to delete products (manager-only permission)"""
+        product_id = test_products[2].id
+        response = client.delete(
+            f"/api/admin/products/{product_id}", headers=auth_headers_staff
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN

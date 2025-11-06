@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     "Administrative workspace for AWE Electronics staff and managers to manage fulfillment and performance.",
 };
 
-const DASHBOARD_ITEMS: DashboardNavItem[] = [
+const STAFF_NAV_ITEMS: DashboardNavItem[] = [
   {
     key: "staff",
     href: "/staff",
@@ -27,6 +27,17 @@ const DASHBOARD_ITEMS: DashboardNavItem[] = [
     description: "Process orders and manage stock",
     icon: "staff",
   },
+  {
+    key: "products",
+    href: "/staff/products",
+    label: "Products",
+    description: "Create, edit, and track catalogue",
+    icon: "shield",
+  },
+];
+
+const MANAGER_NAV_ITEMS: DashboardNavItem[] = [
+  ...STAFF_NAV_ITEMS,
   {
     key: "manager",
     href: "/manager",
@@ -60,17 +71,7 @@ export default async function DashboardLayout({
     redirect("/");
   }
 
-  const availableNavItems = DASHBOARD_ITEMS.filter((item) => {
-    // Managers can see both tabs
-    if (user?.role === "manager") {
-      return true;
-    }
-    // Staff can only see their own tab (which they're already on, so hide nav)
-    if (user?.role === "staff") {
-      return false;
-    }
-    return true;
-  });
+  const availableNavItems = user.role === "manager" ? MANAGER_NAV_ITEMS : STAFF_NAV_ITEMS;
 
   const displayName = getDisplayName(user);
 

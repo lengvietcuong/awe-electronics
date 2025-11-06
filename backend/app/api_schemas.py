@@ -179,7 +179,7 @@ class ProductUpdate(BaseModel):
     stock_quantity: Optional[int] = Field(None, ge=0)
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
-    is_discontinued: Optional[bool] = None
+    low_stock_threshold: Optional[int] = Field(None, ge=0)
 
 
 class ProductResponse(BaseModel):
@@ -197,6 +197,7 @@ class ProductResponse(BaseModel):
     available_quantity: int
     is_available: bool
     is_low_stock: bool
+    low_stock_threshold: int
     image_url: Optional[str]
     is_active: bool
     is_discontinued: bool

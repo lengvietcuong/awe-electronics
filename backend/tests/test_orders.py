@@ -384,3 +384,160 @@ class TestOrderFulfillment:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "DELIVERED"
+
+
+class TestManagerOrderPermissions:
+    """Test that managers can access all order management endpoints (staff permissions)"""
+
+    def test_manager_can_get_pending_orders(
+        self, client, auth_headers_manager, auth_headers_customer, test_products
+    ):
+        """Managers should be able to view pending orders (staff permission)"""
+        # Create an order first
+        product_id = test_products[0].id
+        client.post(
+            "/api/cart/items",
+            headers=auth_headers_customer,
+            json={"product_id": product_id, "quantity": 1},
+        )
+        client.post(
+            "/api/checkout",
+            headers=auth_headers_customer,
+            json={
+                "payment_method": "CREDIT_CARD",
+                "shipping_method": "STANDARD",
+                "delivery_address": {
+                    "street_address": "123 Test St",
+                    "suburb": "Testville",
+                    "state": "VIC",
+                    "postcode": "3000",
+                    "country": "Australia",
+                },
+            },
+        )
+
+        # Manager should be able to get pending orders
+        response = client.get("/api/admin/orders/pending", headers=auth_headers_manager)
+        assert response.status_code == status.HTTP_200_OK
+        assert isinstance(response.json(), list)
+
+    def test_manager_can_ship_order(
+        self, client, auth_headers_manager, auth_headers_customer, test_products
+    ):
+        """Managers should be able to ship orders (staff permission)"""
+        # Create an order
+        product_id = test_products[0].id
+        client.post(
+            "/api/cart/items",
+            headers=auth_headers_customer,
+            json={"product_id": product_id, "quantity": 1},
+        )
+        checkout_response = client.post(
+            "/api/checkout",
+            headers=auth_headers_customer,
+            json={
+                "payment_method": "CREDIT_CARD",
+                "shipping_method": "STANDARD",
+                "delivery_address": {
+                    "street_address": "123 Test St",
+                    "suburb": "Testville",
+                    "state": "VIC",
+                    "postcode": "3000",
+                    "country": "Australia",
+                },
+            },
+        )
+        order_id = checkout_response.json()["order_id"]
+
+        # Manager should be able to ship order
+        response = client.post(
+            f"/api/admin/orders/{order_id}/ship",
+            headers=auth_headers_manager,
+            json={
+                "courier_name": "Australia Post",
+                "tracking_number": "AU123456789",
+            },
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["tracking_number"] == "AU123456789"
+
+    def test_manager_can_mark_delivered(
+        self, client, auth_headers_manager, auth_headers_customer, test_products
+    ):
+        """Managers should be able to mark orders as delivered (staff permission)"""
+        # Create and ship an order
+        product_id = test_products[0].id
+        client.post(
+            "/api/cart/items",
+            headers=auth_headers_customer,
+            json={"product_id": product_id, "quantity": 1},
+        )
+        checkout_response = client.post(
+            "/api/checkout",
+            headers=auth_headers_customer,
+            json={
+                "payment_method": "CREDIT_CARD",
+                "shipping_method": "STANDARD",
+                "delivery_address": {
+                    "street_address": "123 Test St",
+                    "suburb": "Testville",
+                    "state": "VIC",
+                    "postcode": "3000",
+                    "country": "Australia",
+                },
+            },
+        )
+        order_id = checkout_response.json()["order_id"]
+
+        # Ship it first
+        client.post(
+            f"/api/admin/orders/{order_id}/ship",
+            headers=auth_headers_manager,
+            json={
+                "courier_name": "Australia Post",
+                "tracking_number": "AU987654321",
+            },
+        )
+
+        # Manager should be able to mark as delivered
+        response = client.post(
+            f"/api/admin/orders/{order_id}/deliver", headers=auth_headers_manager
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["status"] == "DELIVERED"
+
+    def test_manager_can_cancel_order(
+        self, client, auth_headers_manager, auth_headers_customer, test_products
+    ):
+        """Managers should be able to cancel orders (staff permission)"""
+        # Create an order
+        product_id = test_products[0].id
+        client.post(
+            "/api/cart/items",
+            headers=auth_headers_customer,
+            json={"product_id": product_id, "quantity": 1},
+        )
+        checkout_response = client.post(
+            "/api/checkout",
+            headers=auth_headers_customer,
+            json={
+                "payment_method": "CREDIT_CARD",
+                "shipping_method": "STANDARD",
+                "delivery_address": {
+                    "street_address": "123 Test St",
+                    "suburb": "Testville",
+                    "state": "VIC",
+                    "postcode": "3000",
+                    "country": "Australia",
+                },
+            },
+        )
+        order_id = checkout_response.json()["order_id"]
+
+        # Manager should be able to cancel order
+        response = client.post(
+            f"/api/admin/orders/{order_id}/cancel", headers=auth_headers_manager
+        )
+        assert response.status_code == status.HTTP_200_OK
